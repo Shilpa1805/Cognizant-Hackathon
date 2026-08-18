@@ -1,24 +1,16 @@
 """
 Router: /questions
-Contains:
-- GET /questions: Retrieve questions list filtered by role or topic
-- GET /questions/next: Get a role & topic relevant question (generation -> Chroma/bank fallback)
-- POST /questions/followup & POST /answers/followup: Generate targeted follow-up question
-- POST /questions/stt: Speech-to-text transcript endpoint
+GET /questions/next  — wires Person 1 (ChromaDB) + Person 2 (Gemini) together.
+GET /questions       — returns a list of questions (bulk endpoint).
 """
 
 import uuid
 from typing import List, Optional
+from fastapi import APIRouter, HTTPException, Query
 
-from fastapi import APIRouter, Query, Depends, HTTPException, UploadFile, File
-from pydantic import BaseModel
-from sqlalchemy.orm import Session
-
-from app.database import get_db
-from app.models.question import Question as QuestionModel
 from app.schemas.questions import QuestionOut
-from app.services.question_generation import generate_questions, generate_follow_up, generate_question, GenerationError
-from app.services.vector_store import search_questions, vector_store
+from app.services.vector_store import vector_store
+from app.services.question_generation import generate_question, GenerationError
 
 router = APIRouter()
 
@@ -32,155 +24,155 @@ def _to_uuid(raw_id: str) -> uuid.UUID:
     try:
         return uuid.UUID(str(raw_id))
     except (ValueError, AttributeError):
+        # Generate a deterministic UUID5 if the raw ID is numeric (e.g. from SEDE)
         return uuid.uuid5(uuid.NAMESPACE_DNS, str(raw_id))
 
 
-class FollowupRequestPayload(BaseModel):
-    answer_text: Optional[str] = ""
-    original_question_text: Optional[str] = ""
-    missing_keywords: Optional[List[str]] = []
-    role_id: Optional[uuid.UUID] = None
-    topic_id: Optional[uuid.UUID] = None
+@router.get("/next", response_model=QuestionOut)
+def next_question(
+    role: Optional[str] = Query(None, description="Filter by role, e.g. 'Backend Engineer'"),
+    topic: Optional[str] = Query(None, description="Filter by topic, e.g. 'Python / Data Structures'"),
+    difficulty: Optional[str] = Query(None, description="Preferred difficulty: Easy, Medium, Hard"),
+) -> QuestionOut:
+    """
+    Returns ONE freshly generated interview question for the given role, topic, and difficulty.
+
+    **How it works (ChromaDB is always consulted first):**
+
+    1. **ChromaDB grounding** — fetches up to 3 real Stack Overflow examples from the
+       question bank using a smart cascade:
+       - Tries exact `role + topic + difficulty` match first.
+       - If not found: drops topic, keeps difficulty.
+       - If still not found: tries adjacent difficulty levels (Medium → Easy → Hard).
+       - If still not found: falls back to role-only examples.
+       Any unknown role (e.g. `ML Engineer`, `iOS Developer`) is automatically mapped
+       to the nearest group (`Backend Engineer`, `Frontend Engineer`, etc.).
+
+    2. **Gemini generation** — the retrieved examples + adaptation notes are injected
+       into a structured prompt. Gemini generates a *brand-new* question in the same
+       style, at the correct difficulty, specifically for the requested role and topic.
+       Up to 3 Gemini models are tried with 2 retries each before giving up.
+
+    3. **Emergency fallback** *(only if Gemini API is completely unavailable)* —
+       returns an existing ChromaDB question directly. `source` field will be
+       `"chromadb"` instead of `"gemini"` so you can tell which path was taken.
+
+    4. **404** — only if both Gemini and ChromaDB return nothing (extremely unlikely).
+
+    **`source` field values:**
+    - `"gemini"` → fresh AI-generated question grounded on ChromaDB examples ✅
+    - `"chromadb"` → existing question served directly (Gemini API was unavailable)
+    """
+    role_filter = role or "Backend Engineer"
+    topic_filter = topic or "Python / Data Structures"
+    difficulty_filter = difficulty or "Medium"
+
+    # --- Attempt 1: Gemini generation (Person 2) ---
+    try:
+        ai_q = generate_question(
+            role=role_filter,
+            topic=topic_filter,
+            difficulty=difficulty_filter,
+        )
+        return QuestionOut(
+            question_id=_to_uuid(ai_q.id),
+            topic_id=_DEFAULT_TOPIC_ID,
+            role_id=_DEFAULT_ROLE_ID,
+            question_text=ai_q.question_text,
+            reference_answer=ai_q.reference_answer,
+            difficulty=ai_q.difficulty.lower() if ai_q.difficulty else difficulty_filter.lower(),
+            source="gemini",
+        )
+    except (GenerationError, Exception) as exc:
+        import logging
+        logging.getLogger(__name__).warning("Gemini failed, falling back. Error: %s", repr(exc))
+        pass  # fall through to ChromaDB
+
+    # --- Attempt 2: ChromaDB bank (Person 1) ---
+    bank = vector_store.get_random_questions(
+        role=role_filter,
+        topic=topic_filter,
+        count=1,
+    )
+    if bank:
+        bq = bank[0]
+        return QuestionOut(
+            question_id=_to_uuid(bq.id),
+            topic_id=_DEFAULT_TOPIC_ID,
+            role_id=_DEFAULT_ROLE_ID,
+            question_text=bq.question_text,
+            reference_answer=bq.reference_answer,
+            difficulty=bq.difficulty.lower() if bq.difficulty else None,
+            source="chromadb",
+        )
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"No questions available for role='{role_filter}' topic='{topic_filter}'.",
+    )
 
 
 @router.get("", response_model=List[QuestionOut])
 def get_questions(
-    role: Optional[str] = Query(None, description="Filter by role ID or role name"),
-    topic: Optional[str] = Query(None, description="Filter by topic ID or topic name"),
-    db: Session = Depends(get_db),
+    role: Optional[str] = Query(None, description="Filter by role name, e.g. 'Backend Engineer'"),
+    topic: Optional[str] = Query(None, description="Filter by topic name, e.g. 'Python / Data Structures'"),
+    count: int = Query(3, ge=1, le=10, description="Number of questions to retrieve (3-5 typical)"),
 ) -> List[QuestionOut]:
-    """Returns all available questions from DB or bank."""
-    query = db.query(QuestionModel)
-    if role:
-        try:
-            r_uuid = uuid.UUID(role)
-            query = query.filter(QuestionModel.role_id == r_uuid)
-        except ValueError:
-            pass
-    if topic:
-        try:
-            t_uuid = uuid.UUID(topic)
-            query = query.filter(QuestionModel.topic_id == t_uuid)
-        except ValueError:
-            pass
+    """
+    Returns a batch of `count` questions (default 3) for the given role and topic.
 
-    results = query.limit(20).all()
-    if results:
-        return results
+    **How it works:**
 
-    # Fallback default seed objects if DB is empty
-    return [
-        QuestionOut(
-            question_id=uuid.UUID("11111111-1111-1111-1111-000000000101"),
-            topic_id=uuid.UUID("22222222-2222-2222-2222-000000000001"),
-            role_id=uuid.UUID("11111111-1111-1111-1111-000000000001"),
-            question_text="How do you detect a cycle in a singly linked list?",
-            reference_answer="Use Floyd's Cycle-Finding Algorithm (Fast and Slow Pointers).",
-            difficulty="Medium",
-            source="curated_bank",
+    - **Slot 1** — Gemini generates a fresh question grounded on ChromaDB examples
+      (same ChromaDB-first pipeline as `GET /questions/next`).
+    - **Slots 2–N** — filled with random questions pulled directly from ChromaDB.
+
+    Use this endpoint to pre-load a set of questions at the start of a session.
+    Use `GET /questions/next` to fetch one question at a time during an active session.
+    """
+    role_filter = role or "Backend Engineer"
+    topic_filter = topic or "Python / Data Structures"
+    
+    questions_out: List[QuestionOut] = []
+
+    # 1. Attempt fresh Gemini generation for the leading question
+    try:
+        ai_q = generate_question(role=role_filter, topic=topic_filter)
+        questions_out.append(
+            QuestionOut(
+                question_id=_to_uuid(ai_q.id),
+                topic_id=_DEFAULT_TOPIC_ID,
+                role_id=_DEFAULT_ROLE_ID,
+                question_text=ai_q.question_text,
+                reference_answer=ai_q.reference_answer,
+                difficulty=ai_q.difficulty.lower(),
+                source="gemini",
+            )
         )
-    ]
+    except (GenerationError, Exception) as e:
+        # Graceful fallback: log and continue to fill directly from bank
+        pass
 
-
-@router.get("/next", response_model=QuestionOut)
-def get_next_question(
-    role_id: Optional[str] = Query(None, description="Role UUID"),
-    topic_id: Optional[str] = Query(None, description="Topic UUID"),
-    db: Session = Depends(get_db),
-) -> QuestionOut:
-    """
-    Pod 1 Core Endpoint: /questions/next
-    Attempts LLM generation grounded in ChromaDB exemplars.
-    Falls back to ChromaDB / SQL Bank lookup if generation fails.
-    Guaranteed never to throw a 500 error to the caller for recoverable issues.
-    """
-    default_role = role_id or "11111111-1111-1111-1111-000000000001"
-    default_topic = topic_id or "22222222-2222-2222-2222-000000000001"
-
-    # 1. Attempt generation
-    try:
-        generated = generate_questions(role_id=default_role, topic_id=default_topic, count=1)
-        if generated and len(generated) > 0:
-            q_data = generated[0]
-            return QuestionOut(
-                question_id=uuid.UUID(q_data["question_id"]),
-                topic_id=uuid.UUID(default_topic) if isinstance(default_topic, str) and len(default_topic) == 36 else uuid.uuid4(),
-                role_id=uuid.UUID(default_role) if isinstance(default_role, str) and len(default_role) == 36 else uuid.uuid4(),
-                question_text=q_data["question_text"],
-                reference_answer=q_data.get("reference_answer"),
-                difficulty=q_data.get("difficulty", "medium"),
-                source=q_data.get("source", "generated"),
+    # 2. Retrieve remaining questions from ChromaDB Question Bank
+    needed = count - len(questions_out)
+    if needed > 0:
+        bank_questions = vector_store.get_random_questions(
+            role=role_filter,
+            topic=topic_filter,
+            count=needed,
+        )
+        
+        for bq in bank_questions:
+            questions_out.append(
+                QuestionOut(
+                    question_id=_to_uuid(bq.id),
+                    topic_id=_DEFAULT_TOPIC_ID,
+                    role_id=_DEFAULT_ROLE_ID,
+                    question_text=bq.question_text,
+                    reference_answer=bq.reference_answer,
+                    difficulty=bq.difficulty.lower(),
+                    source="chromadb",
+                )
             )
-    except Exception as exc:
-        print(f"Error in generation phase of /questions/next: {exc}")
 
-    # 2. ChromaDB search fallback
-    try:
-        chroma_res = search_questions("interview question", role_id=role_id, topic_id=topic_id, top_k=1)
-        if chroma_res:
-            c = chroma_res[0]
-            return QuestionOut(
-                question_id=uuid.UUID(c.get("question_id", str(uuid.uuid4()))),
-                topic_id=uuid.UUID(c.get("topic_id", str(uuid.uuid4()))),
-                role_id=uuid.UUID(c.get("role_id", str(uuid.uuid4()))),
-                question_text=c.get("question_text", "Explain key software engineering principles."),
-                reference_answer=c.get("reference_answer", ""),
-                difficulty=c.get("difficulty", "medium"),
-                source="chroma_fallback",
-            )
-    except Exception as exc:
-        print(f"Error in vector search phase of /questions/next: {exc}")
-
-    # 3. SQL DB fallback
-    db_q = db.query(QuestionModel).first()
-    if db_q:
-        return db_q
-
-    # 4. Ultimate hardcoded fallback
-    return QuestionOut(
-        question_id=uuid.uuid4(),
-        topic_id=uuid.UUID("22222222-2222-2222-2222-000000000001"),
-        role_id=uuid.UUID("11111111-1111-1111-1111-000000000001"),
-        question_text="How do you detect a cycle in a singly linked list?",
-        reference_answer="Use Floyd's Cycle-Finding Algorithm (Fast and Slow Pointers).",
-        difficulty="Medium",
-        source="bank_fallback",
-    )
-
-
-@router.post("/followup", response_model=QuestionOut)
-def create_followup_question(payload: FollowupRequestPayload) -> QuestionOut:
-    """
-    Pod 1 Stretch Goal: /answers/followup / /questions/followup
-    Generates a targeted follow-up question based on missing_keywords from a scored answer.
-    """
-    res = generate_follow_up(
-        answer_text=payload.answer_text or "",
-        original_question_text=payload.original_question_text or "",
-        missing_keywords=payload.missing_keywords or [],
-        role_id=str(payload.role_id) if payload.role_id else None,
-        topic_id=str(payload.topic_id) if payload.topic_id else None,
-    )
-
-    return QuestionOut(
-        question_id=uuid.UUID(res["question_id"]),
-        topic_id=payload.topic_id or uuid.UUID("22222222-2222-2222-2222-000000000001"),
-        role_id=payload.role_id or uuid.UUID("11111111-1111-1111-1111-000000000001"),
-        question_text=res["question_text"],
-        reference_answer=res.get("reference_answer"),
-        difficulty=res.get("difficulty", "medium"),
-        source=res.get("source", "followup"),
-    )
-
-
-@router.post("/stt")
-async def speech_to_text(file: Optional[UploadFile] = File(None)) -> dict:
-    """
-    Pod 1 Stretch Goal: Speech-to-text input handler.
-    Transcribes uploaded audio files or returns simulated transcript.
-    """
-    if file:
-        filename = file.filename or "audio.wav"
-        return {"status": "success", "transcript": f"Audio file {filename} processed successfully.", "confidence": 0.95}
-    return {"status": "success", "transcript": "Speech input recorded and processed.", "confidence": 0.90}
-
+    return questions_out

@@ -1,21 +1,16 @@
-"""
-Question Generation Service — Gemini LLM + Vector Store Retrieval
-==================================================================
-Retrieves exemplar questions from ChromaDB vector store for a role/topic,
-then prompts Gemini LLM to generate grounded interview questions and follow-ups.
-Includes fail-safe fallback if LLM is unavailable.
-"""
-
 import json
-import os
 import re
 import time
 import uuid
-from typing import List, Dict, Any, Optional
+
+from google import genai
+from google.genai import types
 from pydantic import BaseModel, Field
 
 from app.schemas import Question
-from app.services.vector_store import search_questions, vector_store
+from app.schemas.answers import FollowUpRequest
+from app.services.vector_store import vector_store
+from app.config import settings
 
 
 class GenerationError(Exception):
@@ -31,202 +26,204 @@ class GeneratedQuestionPayload(BaseModel):
     reference_answer: str = Field(description="Comprehensive reference answer")
 
 
-# List of models in order of priority
+# List of models in order of priority (lite/flash models experience less queue congestion)
 FALLBACK_MODELS = [
-    "gemini-2.5-flash",
-    "gemini-1.5-flash",
     "gemini-3.5-flash-lite",
     "gemini-flash-lite-latest",
+    "gemini-3.5-flash",
+    "gemini-flash-latest",
+    "gemini-3.7-flash",
 ]
 
-# Gemini SDK check
-try:
-    from google import genai
-    from google.genai import types
-    HAS_GENAI = True
-except ImportError:
-    HAS_GENAI = False
 
-
-def _get_genai_client():
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if HAS_GENAI and api_key:
-        try:
-            return genai.Client(api_key=api_key)
-        except Exception as e:
-            print(f"GenAI Client init warning: {e}")
-    return None
-
-
-def generate_questions(role_id: str, topic_id: str, count: int = 1) -> List[dict]:
+def _build_prompt(
+    role: str,
+    topic: str,
+    difficulty: str,
+    examples_context: str,
+    adaptation_notes: str,
+) -> str:
     """
-    Retrieve exemplars from vector store and prompt LLM to produce a new grounded question.
-    Falls back to exemplar/bank lookup if LLM generation fails.
+    Builds a grounded Gemini prompt.
+    If adaptation_notes is non-empty, it tells Gemini exactly what adjustments
+    to make (e.g. wrong difficulty, topic missing, role was mapped).
     """
-    exemplars = search_questions("interview question candidate assessment", role_id=role_id, topic_id=topic_id, top_k=3)
-    
-    client = _get_genai_client()
-    if client and exemplars:
-        try:
-            exemplar_text = "\n".join(
-                [f"- Question: {ex.get('question_text')}\n  Reference Answer: {ex.get('reference_answer')}" for ex in exemplars]
-            )
+    adaptation_block = (
+        f"\nIMPORTANT ADAPTATION INSTRUCTIONS:\n{adaptation_notes}\n"
+        if adaptation_notes.strip()
+        else ""
+    )
 
-            prompt = (
-                f"You are an expert technical interviewer.\n"
-                f"Below are reference interview questions for topic '{topic_id}' and role '{role_id}':\n"
-                f"{exemplar_text}\n\n"
-                f"Generate {count} NEW interview question(s) grounded strictly in the domain of the examples provided above.\n"
-                f"Respond ONLY with a JSON array of objects having keys: 'question_text', 'reference_answer', 'difficulty' ('easy'|'medium'|'hard')."
-            )
+    examples_block = (
+        f"Grounding Examples (use these to match style, depth, and format):\n{examples_context}"
+        if examples_context.strip()
+        else "No grounding examples available — generate from scratch."
+    )
 
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+    return f"""You are an expert technical interviewer. Your job is to generate 1 high-quality interview question.
 
-            if response and response.text:
-                cleaned = response.text.strip()
-                if cleaned.startswith("```json"):
-                    cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-                elif cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1].split("```")[0].strip()
-                
-                parsed = json.loads(cleaned)
-                if isinstance(parsed, dict):
-                    parsed = [parsed]
-                
-                results = []
-                for item in parsed[:count]:
-                    results.append({
-                        "question_id": str(uuid.uuid4()),
-                        "role_id": str(role_id),
-                        "topic_id": str(topic_id),
-                        "question_text": item.get("question_text", ""),
-                        "reference_answer": item.get("reference_answer", ""),
-                        "difficulty": item.get("difficulty", "medium"),
-                        "source": "generated"
-                    })
-                if results:
-                    return results
-        except Exception as exc:
-            print(f"LLM Question Generation failed: {exc}. Using fallback bank lookup.")
+TARGET PARAMETERS:
+- Role: {role}
+- Topic: {topic}
+- Difficulty: {difficulty}
+{adaptation_block}
+{examples_block}
 
-    # Fallback: Return from exemplars or default template
-    if exemplars:
-        ex = exemplars[0]
-        return [{
-            "question_id": str(uuid.uuid4()),
-            "role_id": str(role_id),
-            "topic_id": str(topic_id),
-            "question_text": ex.get("question_text", "Explain key trade-offs in distributed systems."),
-            "reference_answer": ex.get("reference_answer", "Key trade-offs include latency vs consistency and throughput vs durability."),
-            "difficulty": ex.get("difficulty", "medium"),
-            "source": "bank_fallback"
-        }]
+RULES:
+1. The question MUST be exactly {difficulty} difficulty — not easier, not harder.
+2. The question MUST be relevant to {role} working on {topic}.
+3. The reference_answer must be thorough and technically accurate.
+4. Do NOT copy the example questions — generate something new and distinct.
+5. Match the style and depth of the examples.
 
-    return [{
-        "question_id": str(uuid.uuid4()),
-        "role_id": str(role_id),
-        "topic_id": str(topic_id),
-        "question_text": "What are the core principles of object-oriented design and modular architecture?",
-        "reference_answer": "Encapsulation, Abstraction, Inheritance, Polymorphism, and Low Coupling / High Cohesion.",
-        "difficulty": "medium",
-        "source": "bank_fallback"
-    }]
+Return valid JSON with exactly these keys:
+  "role", "topic", "difficulty", "question_text", "reference_answer"
+"""
 
 
 def generate_question(role: str, topic: str, difficulty: str = "Medium") -> Question:
     """
-    Attempts to generate a single question object with retry support across models.
-    """
-    client = _get_genai_client()
-    if not client:
-        # Fallback to local vector store
-        examples = vector_store.get_grounding_examples(role=role, topic=topic, n_results=1)
-        if examples:
-            return examples[0]
-        return Question(
-            id=str(uuid.uuid4()),
-            role=role,
-            topic=topic,
-            difficulty=difficulty,
-            question_text="How do you detect a cycle in a singly linked list?",
-            reference_answer="Use Floyd's Cycle-Finding Algorithm (Fast and Slow Pointers)."
-        )
+    Generates a grounded interview question using ChromaDB examples + Gemini.
 
-    res_list = generate_questions(role_id=role, topic_id=topic, count=1)
-    if res_list:
-        item = res_list[0]
-        return Question(
-            id=item["question_id"],
-            role=role,
-            topic=topic,
-            difficulty=item.get("difficulty", difficulty),
-            question_text=item.get("question_text", ""),
-            reference_answer=item.get("reference_answer", "")
-        )
+    Flow:
+      1. Call get_smart_grounding() — cascading ChromaDB fallback that handles
+         unknown roles, missing topics, and missing difficulty levels.
+      2. Build a prompt that includes the examples AND any adaptation notes
+         telling Gemini exactly what to adjust.
+      3. Try Gemini models in order; retry once per model on transient errors.
+      4. Raise GenerationError only if every model/attempt is exhausted.
+    """
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        raise GenerationError("GEMINI_API_KEY environment variable is not set.")
+
+    # 1. Smart ChromaDB grounding — always returns something useful
+    grounding_examples, adaptation_notes = vector_store.get_smart_grounding(
+        role=role, topic=topic, difficulty=difficulty, n_results=3
+    )
+
+    examples_context = "\n\n".join(
+        f"Example {i + 1}:\n"
+        f"  Question: {eg.question_text}\n"
+        f"  Answer:   {eg.reference_answer}"
+        for i, eg in enumerate(grounding_examples)
+    )
+
+    # 2. Build prompt with adaptation instructions baked in
+    prompt = _build_prompt(role, topic, difficulty, examples_context, adaptation_notes)
+
+    client = genai.Client(api_key=api_key)
+    last_err = None
+
+    # 3. Try each model; one retry per model on transient errors
+    for model_name in FALLBACK_MODELS:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.7,
+                    ),
+                )
+
+                if response.text:
+                    raw_text = re.sub(r"^```json\s*|\s*```$", "", response.text.strip())
+                    data = json.loads(raw_text)
+
+                    return Question(
+                        id=str(uuid.uuid4()),
+                        role=data.get("role", role),
+                        topic=data.get("topic", topic),
+                        difficulty=data.get("difficulty", difficulty),
+                        question_text=data["question_text"],
+                        reference_answer=data["reference_answer"],
+                    )
+
+            except Exception as e:
+                last_err = e
+                time.sleep(1.5)
+                continue
+
+    raise GenerationError(f"All Gemini models failed. Last error: {last_err}")
+
+
+def generate_followup_question(request: FollowUpRequest) -> Question:
+    """
+    Generates a follow-up question based on the user's previous answer and missing concepts.
+    If the score is low, it asks a foundational question about the missing concepts.
+    If the score is high but keywords are missing, it asks an advanced/nuanced question.
+    """
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        raise GenerationError("GEMINI_API_KEY environment variable is not set.")
+
+    # Format missing keywords string
+    missing_str = ", ".join(request.score.missing_keywords) if request.score.missing_keywords else "None"
     
-    raise GenerationError("Unable to generate question.")
+    # Determine posture based on the fused score
+    fused = request.score.fused_score or 0.0
+    if fused < 0.5:
+        posture = "The candidate struggled with the original question. Ask a simpler, foundational question focusing heavily on explaining these missing concepts."
+    elif fused >= 0.8:
+        posture = "The candidate did well but missed some details. Ask a nuanced, advanced question about these missing concepts to test their deep understanding."
+    else:
+        posture = "The candidate's answer was average. Ask a follow-up question specifically drilling down into these missing concepts."
 
+    prompt = f"""You are an expert technical interviewer following up on a candidate's answer.
+Your job is to generate exactly 1 follow-up interview question to probe their weak spots.
 
-def generate_follow_up(
-    answer_text: str,
-    original_question_text: str,
-    missing_keywords: Optional[List[str]] = None,
-    role_id: Optional[str] = None,
-    topic_id: Optional[str] = None
-) -> dict:
-    """
-    Given a student's answer and missing_keywords from scoring, generate one targeted
-    follow-up question probing that gap.
-    """
-    missing_str = ", ".join(missing_keywords) if missing_keywords else "depth and practical examples"
+CONTEXT:
+- Original Question: {request.original_question}
+- Candidate's Answer: {request.user_answer}
+- Overall Score: {fused * 100:.1f}/100
+- Missing Concepts / Keywords: {missing_str}
 
-    client = _get_genai_client()
-    if client:
-        try:
-            prompt = (
-                f"A candidate answered the question: '{original_question_text}'\n"
-                f"Candidate's Answer: '{answer_text}'\n"
-                f"Missing concepts/keywords identified: {missing_str}\n\n"
-                f"Generate ONE focused, follow-up interview question probing the candidate specifically on the missing concepts ({missing_str}).\n"
-                f"Respond ONLY with a JSON object having keys: 'question_text', 'reference_answer', 'difficulty'."
-            )
+YOUR INSTRUCTIONS:
+1. {posture}
+2. The question MUST directly address the missing concepts if they are provided.
+3. The reference_answer must be thorough and technically accurate.
+4. Do NOT compliment or critique the user in the question text (e.g. no "You missed X, so tell me..."). Just ask the question directly.
 
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+Return valid JSON with exactly these keys:
+  "role" (string, default to "Follow-up"), 
+  "topic" (string, the specific topic of this follow-up), 
+  "difficulty" (string, either "Easy", "Medium", "Hard"), 
+  "question_text" (string, the actual question), 
+  "reference_answer" (string, the correct answer)
+"""
 
-            if response and response.text:
-                cleaned = response.text.strip()
-                if cleaned.startswith("```json"):
-                    cleaned = cleaned.split("```json")[1].split("```")[0].strip()
-                elif cleaned.startswith("```"):
-                    cleaned = cleaned.split("```")[1].split("```")[0].strip()
-                
-                item = json.loads(cleaned)
-                return {
-                    "question_id": str(uuid.uuid4()),
-                    "role_id": str(role_id or "00000000-0000-0000-0000-000000000001"),
-                    "topic_id": str(topic_id or "00000000-0000-0000-0000-000000000001"),
-                    "question_text": item.get("question_text", ""),
-                    "reference_answer": item.get("reference_answer", ""),
-                    "difficulty": item.get("difficulty", "medium"),
-                    "source": "followup"
-                }
-        except Exception as exc:
-            print(f"LLM Follow-up Generation failed: {exc}. Using fallback template.")
+    client = genai.Client(api_key=api_key)
+    last_err = None
 
-    # Fallback follow-up
-    return {
-        "question_id": str(uuid.uuid4()),
-        "role_id": str(role_id or "00000000-0000-0000-0000-000000000001"),
-        "topic_id": str(topic_id or "00000000-0000-0000-0000-000000000001"),
-        "question_text": f"Could you elaborate further on how you would address {missing_str} in your solution?",
-        "reference_answer": f"The response should specifically outline practical considerations regarding {missing_str}.",
-        "difficulty": "medium",
-        "source": "followup_fallback"
-    }
+    for model_name in FALLBACK_MODELS:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.7,
+                    ),
+                )
 
+                if response.text:
+                    raw_text = re.sub(r"^```json\s*|\s*```$", "", response.text.strip())
+                    data = json.loads(raw_text)
+
+                    return Question(
+                        id=str(uuid.uuid4()),
+                        role=data.get("role", "Follow-up"),
+                        topic=data.get("topic", "Follow-up"),
+                        difficulty=data.get("difficulty", "Medium"),
+                        question_text=data["question_text"],
+                        reference_answer=data["reference_answer"],
+                    )
+            except Exception as e:
+                last_err = e
+                time.sleep(1.5)
+                continue
+
+    raise GenerationError(f"All Gemini models failed for follow-up. Last error: {last_err}")

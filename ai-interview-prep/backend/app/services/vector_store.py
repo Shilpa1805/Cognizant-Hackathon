@@ -1,213 +1,260 @@
-"""
-Vector Store Service — Persistent ChromaDB Integration
-======================================================
-Stores and retrieves questions with metadata (role_id, topic_id, difficulty).
-Supports retrieval-grounded generation for Pod 1.
-"""
-
-import os
 import random
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Optional, Tuple
+
+import chromadb
 
 from app.schemas import Question
 
-try:
-    import chromadb
-    from chromadb.config import Settings
-    HAS_CHROMADB = True
-except ImportError:
-    HAS_CHROMADB = False
-
-# Persistent DB directory
-DATA_DIR = Path(__file__).parent.parent.parent / "data" / "chroma_db"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
-
-_chroma_client = None
-_collection = None
-
-# Fallback in-memory store if ChromaDB is not installed or empty
-_memory_store: List[Dict[str, Any]] = []
+# ---------------------------------------------------------------------------
+# ChromaDB path
+# ---------------------------------------------------------------------------
+CHROMA_DB_PATH = Path(__file__).resolve().parent.parent.parent / "chroma_db"
 
 
-def get_collection():
-    global _chroma_client, _collection
-    if not HAS_CHROMADB:
-        return None
-    if _collection is None:
-        _chroma_client = chromadb.PersistentClient(path=str(DATA_DIR))
-        _collection = _chroma_client.get_or_create_collection(
-            name="question_bank",
-            metadata={"hnsw:space": "cosine"}
-        )
-    return _collection
+# ---------------------------------------------------------------------------
+# Role mapping — maps any job title → nearest ChromaDB group
+# Keys are lowercase-stripped. Anything not found defaults to DEFAULT_GROUP.
+# ---------------------------------------------------------------------------
+ROLE_MAP: dict[str, str] = {
+    # ── Exact existing groups (pass-through) ────────────────────────────────
+    "backend engineer":          "Backend Engineer",
+    "frontend engineer":         "Frontend Engineer",
+    "devops engineer":           "DevOps Engineer",
+    "software engineer":         "Software Engineer",
+    # ── ML / AI / Data ───────────────────────────────────────────────────────
+    "ml engineer":               "Backend Engineer",
+    "machine learning engineer": "Backend Engineer",
+    "ai engineer":               "Backend Engineer",
+    "data scientist":            "Backend Engineer",
+    "data engineer":             "Backend Engineer",
+    "data analyst":              "Backend Engineer",
+    "nlp engineer":              "Backend Engineer",
+    "computer vision engineer":  "Backend Engineer",
+    # ── Full-stack ────────────────────────────────────────────────────────────
+    "full stack engineer":       "Backend Engineer",
+    "fullstack engineer":        "Backend Engineer",
+    "full stack developer":      "Backend Engineer",
+    # ── Mobile ───────────────────────────────────────────────────────────────
+    "ios developer":             "Frontend Engineer",
+    "ios engineer":              "Frontend Engineer",
+    "android developer":         "Frontend Engineer",
+    "android engineer":          "Frontend Engineer",
+    "mobile developer":          "Frontend Engineer",
+    "mobile engineer":           "Frontend Engineer",
+    "react native developer":    "Frontend Engineer",
+    "flutter developer":         "Frontend Engineer",
+    # ── Infra / Cloud / SRE ──────────────────────────────────────────────────
+    "cloud engineer":            "DevOps Engineer",
+    "sre":                       "DevOps Engineer",
+    "site reliability engineer": "DevOps Engineer",
+    "platform engineer":         "DevOps Engineer",
+    "infrastructure engineer":   "DevOps Engineer",
+    "security engineer":         "DevOps Engineer",
+    "cybersecurity engineer":    "DevOps Engineer",
+    "network engineer":          "DevOps Engineer",
+    # ── Product / Management ─────────────────────────────────────────────────
+    "product manager":           "Software Engineer",
+    "product engineer":          "Software Engineer",
+    "technical program manager": "Software Engineer",
+    "engineering manager":       "Software Engineer",
+    # ── QA / Test ────────────────────────────────────────────────────────────
+    "qa engineer":               "Software Engineer",
+    "test engineer":             "Software Engineer",
+    "sdet":                      "Software Engineer",
+    # ── Embedded / Systems ───────────────────────────────────────────────────
+    "embedded engineer":         "Backend Engineer",
+    "systems engineer":          "Backend Engineer",
+    "firmware engineer":         "Backend Engineer",
+}
 
+DEFAULT_GROUP = "Software Engineer"
 
-def ingest_questions(questions: List[Dict[str, Any]]) -> None:
-    """
-    Ingest a list of question dicts into ChromaDB vector store.
-    Each dict should contain: question_id, role_id, topic_id, question_text, reference_answer, difficulty.
-    """
-    global _memory_store
-    _memory_store.extend(questions)
-
-    collection = get_collection()
-    if not collection or not questions:
-        return
-
-    ids = []
-    documents = []
-    metadatas = []
-
-    for q in questions:
-        q_id = str(q.get("question_id"))
-        text = f"Question: {q.get('question_text', '')}\nReference Answer: {q.get('reference_answer', '')}"
-        
-        metadata = {
-            "question_id": q_id,
-            "role_id": str(q.get("role_id", "")),
-            "topic_id": str(q.get("topic_id", "")),
-            "difficulty": str(q.get("difficulty", "medium")),
-            "source": str(q.get("source", "bank")),
-            "reference_answer": str(q.get("reference_answer", "")),
-            "question_text": str(q.get("question_text", ""))
-        }
-
-        ids.append(q_id)
-        documents.append(text)
-        metadatas.append(metadata)
-
-    collection.upsert(
-        ids=ids,
-        documents=documents,
-        metadatas=metadatas
-    )
-
-
-def search_questions(
-    query: str,
-    role_id: Optional[str] = None,
-    topic_id: Optional[str] = None,
-    top_k: int = 3
-) -> List[Dict[str, Any]]:
-    """
-    Search ChromaDB vector store with optional role_id and topic_id metadata filtering.
-    Returns list of question dictionary objects.
-    """
-    collection = get_collection()
-
-    if collection is not None and collection.count() > 0:
-        where_filter = {}
-        if role_id and topic_id:
-            where_filter = {"$and": [{"role_id": str(role_id)}, {"topic_id": str(topic_id)}]}
-        elif role_id:
-            where_filter = {"role_id": str(role_id)}
-        elif topic_id:
-            where_filter = {"topic_id": str(topic_id)}
-
-        kwargs = {"query_texts": [query], "n_results": min(top_k, collection.count())}
-        if where_filter:
-            kwargs["where"] = where_filter
-
-        try:
-            results = collection.query(**kwargs)
-            matches = []
-            if results and results.get("metadatas") and len(results["metadatas"]) > 0:
-                for meta in results["metadatas"][0]:
-                    matches.append(meta)
-            if matches:
-                return matches
-        except Exception as exc:
-            print(f"ChromaDB search error: {exc}. Falling back to memory store.")
-
-    # Fallback to memory store filtering
-    results = []
-    for q in _memory_store:
-        if role_id and str(q.get("role_id")) != str(role_id):
-            continue
-        if topic_id and str(q.get("topic_id")) != str(topic_id):
-            continue
-        results.append(q)
-        if len(results) >= top_k:
-            break
-    
-    if not results:
-        results = _memory_store[:top_k]
-
-    return results
-
-
-def ingest_documents(documents: List[dict]) -> None:
-    ingest_questions(documents)
-
-
-def search(query: str, top_k: int = 5) -> List[dict]:
-    return search_questions(query, top_k=top_k)
+# Ordered fallback chain for difficulty: preferred → adjacent → opposite
+DIFFICULTY_FALLBACK: dict[str, list[str]] = {
+    "Easy":   ["Easy",   "Medium", "Hard"],
+    "Medium": ["Medium", "Easy",   "Hard"],
+    "Hard":   ["Hard",   "Medium", "Easy"],
+}
 
 
 class VectorStoreService:
-    def __init__(self, db_path: Path = DATA_DIR):
-        self.db_path = db_path
+    def __init__(self, db_path: Path = CHROMA_DB_PATH):
+        self.client = chromadb.PersistentClient(path=str(db_path))
+        self.collection = self.client.get_or_create_collection(
+            name="question_bank",
+            metadata={"hnsw:space": "cosine"}
+        )
 
-    def get_question(self, role: str, topic: Optional[str] = None, limit: int = 5) -> List[Question]:
-        collection = get_collection()
-        if not collection:
+    # ── Internal fetch helper ────────────────────────────────────────────────
+    def _fetch(
+        self,
+        role: Optional[str] = None,
+        topic: Optional[str] = None,
+        difficulty: Optional[str] = None,
+        n: int = 3,
+    ) -> List[Question]:
+        """
+        Builds a ChromaDB where-filter from any combination of fields and
+        returns up to n Question objects. Returns [] on no match or error.
+        """
+        conditions = []
+        if role:
+            conditions.append({"role": role})
+        if topic:
+            conditions.append({"topic": topic})
+        if difficulty:
+            conditions.append({"difficulty": difficulty})
+
+        if not conditions:
+            where = None
+        elif len(conditions) == 1:
+            where = conditions[0]
+        else:
+            where = {"$and": conditions}
+
+        try:
+            results = (
+                self.collection.get(where=where, limit=n)
+                if where
+                else self.collection.get(limit=n)
+            )
+        except Exception:
             return []
-        where_filter = {"role_id": role} if not topic else {"$and": [{"role_id": role}, {"topic_id": topic}]}
-        results = collection.get(where=where_filter, limit=limit)
-        if not results["ids"] and topic:
-            results = collection.get(where={"role_id": role}, limit=1)
+
         if not results["ids"]:
             return []
+
         return [
             Question(
                 id=results["ids"][i],
-                role=results["metadatas"][i].get("role_id", role),
-                topic=results["metadatas"][i].get("topic_id", topic or ""),
-                difficulty=results["metadatas"][i].get("difficulty", "medium"),
+                role=results["metadatas"][i]["role"],
+                topic=results["metadatas"][i]["topic"],
+                difficulty=results["metadatas"][i]["difficulty"],
                 question_text=results["documents"][i],
-                reference_answer=results["metadatas"][i].get("reference_answer", "")
+                reference_answer=results["metadatas"][i].get("reference_answer", ""),
             )
             for i in range(len(results["ids"]))
         ]
 
+    # ── Smart grounding (cascade fallback) ──────────────────────────────────
+    def get_smart_grounding(
+        self,
+        role: str,
+        topic: str,
+        difficulty: str,
+        n_results: int = 3,
+    ) -> Tuple[List[Question], str]:
+        """
+        Returns (examples, adaptation_notes).
+
+        Cascade strategy:
+          1. mapped_role + topic + difficulty  → perfect match
+          2. mapped_role + difficulty          → topic missing, note it
+          3. mapped_role + topic + adj_diff    → difficulty missing, note it
+          4. mapped_role only                  → both missing, note both
+          5. empty list + full instruction     → nothing at all
+        """
+        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
+        notes: list[str] = []
+
+        if mapped_role != role:
+            notes.append(
+                f"The requested role '{role}' is not in the question bank; "
+                f"using '{mapped_role}' examples as the closest match. "
+                f"Generate the question specifically for a {role}."
+            )
+
+        # 1. Exact match
+        examples = self._fetch(role=mapped_role, topic=topic, difficulty=difficulty, n=n_results)
+        if examples:
+            return examples, "\n".join(notes)
+
+        # 2. Drop topic — keep difficulty
+        examples = self._fetch(role=mapped_role, difficulty=difficulty, n=n_results)
+        if examples:
+            notes.append(
+                f"Topic '{topic}' is not in the question bank; "
+                f"using {mapped_role} examples from other topics as style anchors. "
+                f"Generate a question specifically about '{topic}'."
+            )
+            return examples, "\n".join(notes)
+
+        # 3. Drop difficulty — keep topic, try adjacent difficulties
+        for adj_diff in DIFFICULTY_FALLBACK.get(difficulty, [difficulty]):
+            examples = self._fetch(role=mapped_role, topic=topic, difficulty=adj_diff, n=n_results)
+            if examples:
+                notes.append(
+                    f"Difficulty '{difficulty}' is not available for this topic; "
+                    f"examples shown are '{adj_diff}'. "
+                    f"Adjust the generated question and answer to '{difficulty}' level."
+                )
+                return examples, "\n".join(notes)
+
+        # 4. Role only — drop both topic and difficulty
+        examples = self._fetch(role=mapped_role, n=n_results)
+        if examples:
+            notes.append(
+                f"Neither topic '{topic}' nor difficulty '{difficulty}' are available "
+                f"for '{mapped_role}' in the question bank. "
+                f"Use these examples only as a style/depth reference. "
+                f"Generate a '{difficulty}' question about '{topic}'."
+            )
+            return examples, "\n".join(notes)
+
+        # 5. Nothing found at all
+        return [], (
+            f"No examples found in ChromaDB for '{mapped_role}'. "
+            f"Generate a '{difficulty}' {role} interview question about '{topic}' "
+            f"from scratch, without grounding examples."
+        )
+
+    # ── Legacy methods (kept for backward compatibility) ─────────────────────
+    def get_question(self, role: str, topic: Optional[str] = None, limit: int = 5) -> List[Question]:
+        """
+        Retrieves questions filtered by role and topic.
+        Returns a list of schemas.Question objects.
+        """
+        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
+        examples = self._fetch(role=mapped_role, topic=topic, n=limit)
+        if not examples and topic:
+            examples = self._fetch(role=mapped_role, n=limit)
+        if not examples:
+            raise ValueError(f"No questions found for role='{role}' (mapped='{mapped_role}').")
+        return examples
+
     def get_grounding_examples(self, role: str, topic: str, n_results: int = 3) -> List[Question]:
-        results = search_questions("interview question", role_id=role, topic_id=topic, top_k=n_results)
-        return [
-            Question(
-                id=str(r.get("question_id", "")),
-                role=str(r.get("role_id", role)),
-                topic=str(r.get("topic_id", topic)),
-                difficulty=str(r.get("difficulty", "medium")),
-                question_text=str(r.get("question_text", "")),
-                reference_answer=str(r.get("reference_answer", ""))
-            )
-            for r in results
-        ]
+        """Legacy grounding fetch — now respects ROLE_MAP."""
+        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
+        examples = self._fetch(role=mapped_role, topic=topic, n=n_results)
+        if not examples:
+            examples = self._fetch(role=mapped_role, n=n_results)
+        return examples
 
-    def get_random_questions(self, role: str, topic: Optional[str] = None, count: int = 1) -> List[Question]:
-        results = search_questions("interview question", role_id=role, topic_id=topic, top_k=50)
-        if not results:
+    def get_random_questions(
+        self, role: str, topic: Optional[str] = None, count: int = 1
+    ) -> List[Question]:
+        """
+        Retrieves random questions from ChromaDB filtered by role and topic.
+        Respects ROLE_MAP so any job title works.
+        """
+        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
+        results_pool = self._fetch(role=mapped_role, topic=topic, n=50)
+        if not results_pool and topic:
+            results_pool = self._fetch(role=mapped_role, n=50)
+        if not results_pool:
             return []
-        random.shuffle(results)
-        selected = results[:count]
-        return [
-            Question(
-                id=str(q.get("question_id", "")),
-                role=str(q.get("role_id", role)),
-                topic=str(q.get("topic_id", topic or "")),
-                difficulty=str(q.get("difficulty", "medium")),
-                question_text=str(q.get("question_text", "")),
-                reference_answer=str(q.get("reference_answer", ""))
-            )
-            for q in selected
-        ]
+
+        random.shuffle(results_pool)
+        return results_pool[:count]
 
 
+# ---------------------------------------------------------------------------
 # Singleton instance
+# ---------------------------------------------------------------------------
 vector_store = VectorStoreService()
 
 
-def get_question(role: str, topic: Optional[str] = None) -> Any:
+def get_question(role: str, topic: Optional[str] = None) -> Question:
+    """Standard Pod 1 function interface."""
     return vector_store.get_question(role, topic)
-
