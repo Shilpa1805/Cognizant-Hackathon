@@ -14,7 +14,7 @@ This module is intentionally empty. Add your implementations below.
 """
 
 from typing import Optional
-
+from .concept_overlap import concept_overlap
 
 def score_answer(
     answer_text: str,
@@ -33,6 +33,13 @@ def score_answer(
         A dict with keys: similarity_score, llm_judge_score, concept_match_score,
         fused_score, feedback_text, missing_keywords (list[str]).
     """
+    concept_result = concept_overlap(
+        answer_text,
+        reference_answer
+)
+
+    concept_match_score = concept_result["score"]
+    missing_concepts = concept_result["missing_concepts"]
     raise NotImplementedError("scoring.score_answer is not yet implemented.")
 
 
