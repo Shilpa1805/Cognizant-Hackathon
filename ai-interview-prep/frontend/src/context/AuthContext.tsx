@@ -20,11 +20,11 @@ export interface OnboardingData {
 }
 
 interface AuthContextValue {
-  user: AuthUser | null
-  token: string | null
+  user: AuthUser
+  token: string
   isAuthenticated: boolean
   onboardingComplete: boolean
-  onboardingData: OnboardingData | null
+  onboardingData: OnboardingData
   login: (token: string, user: AuthUser) => void
   logout: () => void
   completeOnboarding: (data: OnboardingData) => void
@@ -37,61 +37,75 @@ const USER_KEY  = 'pp_user'
 const ONBOARDING_KEY = 'pp_onboarding_complete'
 const ONBOARDING_DATA_KEY = 'pp_onboarding_data'
 
+// Default Demo User for instant demo access without auth barriers
+export const DEFAULT_DEMO_USER: AuthUser = {
+  user_id: '00000000-0000-0000-0000-000000000002',
+  name: 'Demo Pilot',
+  email: 'demo@preppilot.ai',
+  role: 'candidate',
+  created_at: new Date().toISOString(),
+}
+
+export const DEFAULT_ONBOARDING_DATA: OnboardingData = {
+  targetRole: 'software-engineer',
+  targetCompanies: ['Google', 'Amazon', 'Stripe'],
+  experienceLevel: 'mid',
+  focusTopics: ['dsa', 'system-design', 'behavioral'],
+}
+
+const DEFAULT_DEMO_TOKEN = 'demo-jwt-token'
+
 /**
- * AuthProvider — wraps the entire app.
- * Reads persisted auth state from localStorage on mount.
- * Provides login/logout and onboarding state management.
+ * AuthProvider — provides default demo user so all features can be demonstrated smoothly.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(null)
-  const [user, setUser] = useState<AuthUser | null>(null)
-  const [onboardingComplete, setOnboardingComplete] = useState(false)
-  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(null)
-  const [hydrated, setHydrated] = useState(false)
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
+  const [token, setToken] = useState<string>(() => {
+    return localStorage.getItem(TOKEN_KEY) || DEFAULT_DEMO_TOKEN
+  })
+  const [user, setUser] = useState<AuthUser>(() => {
     try {
-      const storedToken = localStorage.getItem(TOKEN_KEY)
-      const storedUser = localStorage.getItem(USER_KEY)
-      const storedOnboarding = localStorage.getItem(ONBOARDING_KEY)
-      const storedOnboardingData = localStorage.getItem(ONBOARDING_DATA_KEY)
-
-      if (storedToken && storedUser) {
-        setToken(storedToken)
-        setUser(JSON.parse(storedUser))
-      }
-      if (storedOnboarding === 'true') {
-        setOnboardingComplete(true)
-      }
-      if (storedOnboardingData) {
-        setOnboardingData(JSON.parse(storedOnboardingData))
-      }
+      const stored = localStorage.getItem(USER_KEY)
+      return stored ? JSON.parse(stored) : DEFAULT_DEMO_USER
     } catch {
-      // Corrupt localStorage — ignore
+      return DEFAULT_DEMO_USER
     }
-    setHydrated(true)
-  }, [])
+  })
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => {
+    const stored = localStorage.getItem(ONBOARDING_KEY)
+    return stored ? stored === 'true' : true
+  })
+  const [onboardingData, setOnboardingData] = useState<OnboardingData>(() => {
+    try {
+      const stored = localStorage.getItem(ONBOARDING_DATA_KEY)
+      return stored ? JSON.parse(stored) : DEFAULT_ONBOARDING_DATA
+    } catch {
+      return DEFAULT_ONBOARDING_DATA
+    }
+  })
+
+  // Ensure default tokens are available for api client interceptor
+  useEffect(() => {
+    if (!localStorage.getItem('access_token')) {
+      localStorage.setItem('access_token', token)
+    }
+  }, [token])
 
   const login = useCallback((newToken: string, newUser: AuthUser) => {
     setToken(newToken)
     setUser(newUser)
     localStorage.setItem(TOKEN_KEY, newToken)
     localStorage.setItem(USER_KEY, JSON.stringify(newUser))
-    // Also keep legacy key for api.ts interceptor
     localStorage.setItem('access_token', newToken)
   }, [])
 
   const logout = useCallback(() => {
-    setToken(null)
-    setUser(null)
-    setOnboardingComplete(false)
-    setOnboardingData(null)
+    // In demo mode, resetting resets to demo user
+    setUser(DEFAULT_DEMO_USER)
+    setToken(DEFAULT_DEMO_TOKEN)
+    setOnboardingComplete(true)
+    setOnboardingData(DEFAULT_ONBOARDING_DATA)
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(ONBOARDING_KEY)
-    localStorage.removeItem(ONBOARDING_DATA_KEY)
-    localStorage.removeItem('access_token')
   }, [])
 
   const completeOnboarding = useCallback((data: OnboardingData) => {
@@ -101,15 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ONBOARDING_DATA_KEY, JSON.stringify(data))
   }, [])
 
-  // Don't render until hydration is done (prevents flicker)
-  if (!hydrated) return null
-
   return (
     <AuthContext.Provider
       value={{
         user,
         token,
-        isAuthenticated: !!token && !!user,
+        isAuthenticated: true,
         onboardingComplete,
         onboardingData,
         login,

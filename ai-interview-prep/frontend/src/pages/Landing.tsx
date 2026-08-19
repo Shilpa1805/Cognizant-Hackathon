@@ -58,7 +58,7 @@ export default function Landing() {
           <div className={styles.ctaRow}>
             <Button
               as="a"
-              href="/signup"
+              href="/practice"
               variant="primary"
               size="lg"
               withBorder
@@ -69,12 +69,12 @@ export default function Landing() {
             </Button>
             <Button
               as="a"
-              href="/login"
+              href="/dashboard"
               variant="secondary"
               size="lg"
               id="hero-login-btn"
             >
-              Log In
+              Dashboard
             </Button>
           </div>
 
@@ -134,7 +134,7 @@ export default function Landing() {
         </p>
         <Button
           as="a"
-          href="/signup"
+          href="/dashboard"
           variant="primary"
           size="lg"
           withBorder

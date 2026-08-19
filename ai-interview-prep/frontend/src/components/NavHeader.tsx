@@ -21,10 +21,12 @@ const DEFAULT_LOGGED_OUT_LINKS: NavLink_[] = [
 ]
 
 const DEFAULT_LOGGED_IN_LINKS: NavLink_[] = [
-  { to: '/dashboard',    label: 'Dashboard' },
-  { to: '/practice',     label: 'Practice' },
+  { to: '/dashboard',          label: 'Dashboard' },
+  { to: '/practice',           label: 'Practice' },
   { to: '/mock-interview/new', label: 'Mock Interview' },
-  { to: '/analytics',   label: 'Analytics' },
+  { to: '/analytics',          label: 'Analytics' },
+  { to: '/resources',          label: 'Resources' },
+  { to: '/pricing',            label: 'Pricing' },
 ]
 
 /**
