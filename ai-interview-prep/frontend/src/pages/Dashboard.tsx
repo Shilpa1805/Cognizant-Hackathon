@@ -35,12 +35,6 @@ interface DashboardData {
 
 const TOPIC_COLORS = ['#A068FF', '#4ade80', '#60a5fa', '#fbbf24', '#f87171']
 
-// Stub/Mock for recent/upcoming mock interviews
-const RECENT_INTERVIEWS = [
-  { id: 'sess-001', role: 'Software Engineer', date: 'Yesterday', score: '74%' },
-  { id: 'sess-002', role: 'Backend Engineer', date: '3 days ago', score: '61%' },
-]
-
 export default function Dashboard() {
   const { user } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -209,28 +203,23 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recent sessions */}
+          {/* Recent sessions — guided empty state */}
           <div>
             <h2 className={styles.sectionTitle} style={{ marginBottom: 'var(--space-4)' }}>
               Recent Sessions
             </h2>
             <div className={styles.mockList}>
-              {RECENT_INTERVIEWS.map((m) => (
-                <div key={m.id} className={styles.mockItem}>
-                  <div>
-                    <span className={styles.mockTitle}>{m.role}</span>
-                    <p className={styles.mockDate}>{m.date}</p>
-                  </div>
-                  <Badge variant="accent">{m.score}</Badge>
-                </div>
-              ))}
-              <Link
-                to="/history"
-                className="toggleLink"
-                style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center' }}
-              >
-                View all sessions →
-              </Link>
+              <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+                  No sessions recorded yet.
+                </p>
+                <a
+                  href="/mock-interview/new"
+                  style={{ color: 'var(--accent)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}
+                >
+                  Start your first mock interview →
+                </a>
+              </div>
             </div>
           </div>
 

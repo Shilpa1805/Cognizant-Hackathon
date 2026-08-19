@@ -3,6 +3,7 @@ Pydantic schemas for answers (posted under /sessions/{id}/answers).
 """
 
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
@@ -13,6 +14,8 @@ class AnswerCreate(BaseModel):
     question_id: UUID
     user_id: UUID
     answer_text: str
+    question_text: Optional[str] = None       # needed by scoring pipeline
+    reference_answer: Optional[str] = None    # gold answer for comparison
 
 
 class AnswerOut(BaseModel):

@@ -74,16 +74,17 @@ export default function MockInterview() {
     if (loading) return
     setLoading(true)
     try {
-      // Post response to session answers
       const { data: scoreData } = await api.post(
         `/sessions/${targetSessionId}/answers`,
         {
           question_id: question?.question_id ?? '00000000-0000-0000-0000-000000000000',
           user_id: userId,
           answer_text: answer || 'No response provided within mock time limit.',
+          // Send question context so scoring.py can run real ML comparison
+          question_text: question?.question_text ?? '',
+          reference_answer: (question as any)?.reference_answer ?? '',
         },
       )
-      // Navigate to feedback page
       navigate(`/feedback/${targetSessionId}`, {
         state: { score: scoreData, question }
       })

@@ -59,17 +59,20 @@ export default function Practice() {
     if (!answer.trim()) return
     setLoading(true)
     try {
+      const q = questions[currentIdx]
       const { data: scoreData } = await api.post(
         `/sessions/${sessionId}/answers`,
         {
-          question_id: questions[currentIdx]?.question_id,
+          question_id: q?.question_id,
           user_id: userId,
           answer_text: answer,
+          // Send question context so scoring.py can run real ML comparison
+          question_text: q?.question_text ?? '',
+          reference_answer: (q as any)?.reference_answer ?? '',
         },
       )
-      // Navigate to /feedback/:sessionId passing the result
       navigate(`/feedback/${sessionId}`, {
-        state: { score: scoreData, question: questions[currentIdx] }
+        state: { score: scoreData, question: q }
       })
     } catch (err) {
       console.error('Failed to submit answer', err)
