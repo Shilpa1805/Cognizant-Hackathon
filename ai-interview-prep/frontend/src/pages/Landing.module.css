@@ -1,0 +1,275 @@
+/* Landing.module.css */
+
+/* --------------------------------------------------
+   Page root
+   -------------------------------------------------- */
+.page {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  background-image:
+    radial-gradient(ellipse 80% 50% at 70% 50%, rgba(160, 104, 255, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 60% at 20% 80%, rgba(100, 60, 200, 0.08) 0%, transparent 50%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* --------------------------------------------------
+   Hero section
+   -------------------------------------------------- */
+.hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+  padding: 0 var(--nav-px);
+  padding-top: calc(var(--nav-h) + var(--space-16));
+  padding-bottom: var(--space-16);
+  max-width: var(--max-w);
+  margin-inline: auto;
+  width: 100%;
+  min-height: calc(100vh - 80px);
+}
+
+/* --------------------------------------------------
+   Left column: copy + CTAs
+   -------------------------------------------------- */
+.heroLeft {
+  flex: 0 1 600px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) 0.2s both;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: var(--accent-dim);
+  border: 1px solid rgba(160, 104, 255, 0.3);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.heading {
+  font-family: var(--font-heading);
+  font-size: var(--text-6xl);
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: var(--text-light);
+}
+
+/* Split coloring: first portion black-on-white → white, rest white */
+.headingDark {
+  color: var(--text-light);
+}
+
+.headingLight {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.subheading {
+  font-size: var(--text-lg);
+  color: var(--text-muted);
+  line-height: 1.6;
+  max-width: 480px;
+}
+
+.ctaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  animation: fadeUp 0.8s var(--ease-out-expo) 3.2s both;
+}
+
+/* Persona badge */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-left: 290px;
+  margin-top: var(--space-10);
+  animation: fadeUp 0.8s var(--ease-out-expo) 3.6s both;
+  width: fit-content;
+}
+
+.badgeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+  animation: cursorBlink 1.5s ease-in-out infinite;
+}
+
+/* --------------------------------------------------
+   Right column: orbit visual
+   -------------------------------------------------- */
+.heroRight {
+  flex-shrink: 0;
+  animation: scaleIn var(--enter-visual) var(--ease-out-expo) var(--enter-delay-visual) both;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --------------------------------------------------
+   Logo ticker section
+   -------------------------------------------------- */
+.tickerSection {
+  padding: var(--space-8) 0;
+  border-top: 1px solid var(--border-dim);
+  margin-top: var(--space-8);
+}
+
+/* --------------------------------------------------
+   Features strip
+   -------------------------------------------------- */
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+  padding: var(--space-16) var(--nav-px);
+  max-width: var(--max-w);
+  margin-inline: auto;
+  width: 100%;
+}
+
+.featureCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-xl);
+  transition: border-color var(--dur-normal) var(--ease-out-expo),
+              transform var(--dur-normal) var(--ease-out-expo);
+}
+
+.featureCard:hover {
+  border-color: var(--accent);
+  transform: translateY(-4px);
+}
+
+.featureIcon {
+  font-size: 28px;
+}
+
+.featureTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.featureDesc {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* --------------------------------------------------
+   Responsive breakpoints
+   -------------------------------------------------- */
+@media (max-width: 1280px) {
+  .heroRight {
+    transform: scale(0.85);
+    transform-origin: center right;
+  }
+}
+
+@media (max-width: 1024px) {
+  .hero {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding-top: calc(var(--nav-h) + var(--space-12));
+    min-height: auto;
+    padding-inline: var(--space-8);
+  }
+
+  .heroLeft {
+    align-items: center;
+    flex: unset;
+  }
+
+  .heading {
+    font-size: var(--text-5xl);
+  }
+
+  .subheading {
+    text-align: center;
+  }
+
+  .badge {
+    margin-left: 0;
+    margin-top: var(--space-4);
+  }
+
+  .heroRight {
+    transform: scale(0.7);
+    transform-origin: center;
+  }
+
+  .features {
+    grid-template-columns: 1fr 1fr;
+    padding-inline: var(--space-6);
+  }
+}
+
+@media (max-width: 768px) {
+  .heading {
+    font-size: var(--text-4xl);
+  }
+
+  .heroRight {
+    transform: scale(0.5);
+    transform-origin: center;
+    max-height: 360px;
+  }
+
+  .hero {
+    padding-inline: var(--space-6);
+  }
+
+  .features {
+    grid-template-columns: 1fr;
+    padding-inline: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .heading {
+    font-size: var(--text-3xl);
+    letter-spacing: -0.5px;
+  }
+
+  .hero {
+    padding-inline: var(--space-4);
+  }
+
+  .heroRight {
+    transform: scale(0.4);
+  }
+
+  .ctaRow {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+}
