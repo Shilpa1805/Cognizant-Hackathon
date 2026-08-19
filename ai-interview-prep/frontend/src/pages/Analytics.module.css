@@ -1,0 +1,103 @@
+/* Analytics.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.header {
+  margin-bottom: var(--space-8);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.competencyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+}
+
+.radarCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.radarLabel {
+  font-family: var(--font-heading);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+  margin-top: var(--space-4);
+}
+
+.radarCount {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin-top: 2px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: var(--space-4);
+}
+
+.chartCard {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.progressItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.progressLabel {
+  font-size: var(--text-sm);
+  color: var(--text-light);
+  font-weight: 500;
+}
+
+.progressVal {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  font-weight: 700;
+}

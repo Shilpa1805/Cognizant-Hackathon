@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
+import Card from '../components/Card'
+import styles from './StudyPlan.module.css'
 
 interface StudyPlanItem {
   id: string
@@ -17,21 +20,17 @@ const TOPIC_NAMES: Record<string, string> = {
   '66666666-6666-6666-6666-666666666666': 'Behavioural',
 }
 
-const STUB_USER_ID = '00000000-0000-0000-0000-000000000002'
-
-/**
- * StudyPlan page — shows a prioritised list of topics with resources.
- * TODO(frontend-pair): Add ability to mark topics as done / snooze.
- * TODO(dashboard-pair): Replace stub with real study plan generation.
- */
 export default function StudyPlan() {
+  const { user } = useAuth()
   const [plan, setPlan] = useState<StudyPlanItem[]>([])
   const [loading, setLoading] = useState(true)
+
+  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
 
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await api.get(`/study-plan/${STUB_USER_ID}`)
+        const { data } = await api.get(`/study-plan/${userId}`)
         const sorted = [...data].sort(
           (a: StudyPlanItem, b: StudyPlanItem) => a.priority_rank - b.priority_rank,
         )
@@ -43,54 +42,56 @@ export default function StudyPlan() {
       }
     }
     load()
-  }, [])
+  }, [userId])
 
-  if (loading) return <p className="text-gray-500">Loading study plan…</p>
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className="skeleton" style={{ width: '240px', height: '40px', marginBottom: '16px' }} />
+        <div className="skeleton" style={{ height: '360px' }} />
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">Your Study Plan</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Topics ranked by priority — focus on the top items first.
+    <div className={styles.container}>
+      <h1 className={styles.title}>Your Study Plan</h1>
+      <p className={styles.subtitle}>
+        Tailored priorities based on your performance ratings. Target the top items first.
       </p>
 
-      <ol className="space-y-4">
+      <div className={styles.list}>
         {plan.map((item) => (
-          <li
-            key={item.id}
-            className="bg-white rounded-2xl shadow p-5 flex gap-4"
-          >
-            <span className="text-2xl font-bold text-indigo-200 w-8 shrink-0 text-center">
-              {item.priority_rank}
-            </span>
-            <div className="flex-1">
-              <h2 className="font-semibold text-gray-800 mb-2">
+          <Card key={item.id} className={styles.item} variant="nohover">
+            <span className={styles.rank}>{item.priority_rank}</span>
+            <div className={styles.content}>
+              <h2 className={styles.topicName}>
                 {TOPIC_NAMES[item.topic_id] ?? 'Unknown Topic'}
               </h2>
               {item.recommended_resources && item.recommended_resources.length > 0 && (
-                <ul className="space-y-1">
-                  {item.recommended_resources.map((r) => (
-                    <li key={r} className="text-sm text-indigo-600">
+                <div className={styles.resourceList}>
+                  {item.recommended_resources.map((r, idx) => (
+                    <div key={idx} className={styles.resourceItem}>
                       {r.startsWith('http') ? (
                         <a
                           href={r}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="hover:underline"
+                          className={styles.resourceLink}
                         >
                           🔗 {r}
                         </a>
                       ) : (
-                        <span className="text-gray-600">📖 {r}</span>
+                        <span>📖 {r}</span>
                       )}
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               )}
             </div>
-          </li>
+          </Card>
         ))}
-      </ol>
+      </div>
     </div>
   )
 }

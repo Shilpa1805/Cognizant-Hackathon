@@ -1,0 +1,132 @@
+/* Resources.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.header {
+  margin-bottom: var(--space-8);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Article grid layout */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.articleCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 320px;
+}
+
+.cardTop {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.category {
+  font-size: var(--text-xs);
+  color: var(--accent);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.articleTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.excerpt {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--space-4);
+  border-top: 1px solid var(--border-dim);
+  padding-top: var(--space-3);
+}
+
+.readTime {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+/* Article detail modal/pane style */
+.detailContainer {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  margin-top: var(--space-6);
+  animation: fadeUp 0.4s var(--ease-out-expo) both;
+}
+
+.detailHeader {
+  border-bottom: 1px solid var(--border-dim);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.detailTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+  margin-top: var(--space-2);
+}
+
+.detailBody {
+  font-size: var(--text-base);
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.8;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.detailBody p {
+  margin-bottom: var(--space-2);
+}

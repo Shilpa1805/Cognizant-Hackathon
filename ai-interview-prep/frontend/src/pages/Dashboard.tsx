@@ -1,89 +1,240 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
+import Card from '../components/Card'
+import Button from '../components/Button'
+import Badge from '../components/Badge'
+import ProgressRing from '../components/ProgressRing'
+import styles from './Dashboard.module.css'
 
-interface TopicProgress {
-  id: string
+interface TopicSummary {
   topic_id: string
-  avg_score: number | null
+  topic_name: string
+  category: string
+  avg_score: number
   attempts_count: number
-  last_updated: string
+  question_frequency: number
+  priority_score: number
+  priority_rank: number
 }
 
-// Stub topic name map — replace with a real /topics endpoint lookup
-const TOPIC_NAMES: Record<string, string> = {
-  '22222222-2222-2222-2222-222222222222': 'Operating Systems',
-  '33333333-3333-3333-3333-333333333333': 'System Design',
-  '44444444-4444-4444-4444-444444444444': 'Databases',
-  '55555555-5555-5555-5555-555555555555': 'Algorithms',
-  '66666666-6666-6666-6666-666666666666': 'Behavioural',
+interface DashboardData {
+  user_id: string
+  overall_avg_score: number
+  total_answers: number
+  topic_summaries: TopicSummary[]
+  study_plan: Array<{
+    priority_rank: number
+    topic_id: string
+    topic_name: string
+    avg_score: number
+    reason: string
+  }>
 }
 
-// Stub user ID — replace with value from auth context/store
-const STUB_USER_ID = '00000000-0000-0000-0000-000000000002'
+const TOPIC_COLORS = ['#A068FF', '#4ade80', '#60a5fa', '#fbbf24', '#f87171']
 
-/**
- * Dashboard page — shows per-topic average scores.
- * TODO(frontend-pair): Add chart visualisation (e.g. Recharts radar chart).
- * TODO(dashboard-pair): Replace STUB_USER_ID with real user from JWT.
- */
+// Stub/Mock for recent/upcoming mock interviews
+const RECENT_INTERVIEWS = [
+  { id: 'sess-001', role: 'Software Engineer', date: 'Yesterday', score: '74%' },
+  { id: 'sess-002', role: 'Backend Engineer', date: '3 days ago', score: '61%' },
+]
+
 export default function Dashboard() {
-  const [progress, setProgress] = useState<TopicProgress[]>([])
+  const { user } = useAuth()
+  const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Use fallback user UUID if none is available in auth (should not happen if protected)
+  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
 
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await api.get(`/dashboard/${STUB_USER_ID}`)
-        setProgress(data)
+        const { data: res } = await api.get('/dashboard/summary', {
+          params: { user_id: userId }
+        })
+        setData(res)
       } catch (err) {
-        console.error('Failed to load dashboard', err)
+        console.error('Failed to load dashboard summary', err)
       } finally {
         setLoading(false)
       }
     }
     load()
-  }, [])
+  }, [userId])
 
-  if (loading) return <p className="text-gray-500">Loading dashboard…</p>
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.welcomeSection}>
+          <div className="skeleton" style={{ width: '300px', height: '40px' }} />
+        </div>
+        <div className={styles.grid}>
+          <div className={styles.mainCol}>
+            <div className="skeleton" style={{ height: '160px' }} />
+            <div className="skeleton" style={{ height: '300px' }} />
+          </div>
+          <div className={styles.sideCol}>
+            <div className="skeleton" style={{ height: '240px' }} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const overallAvg = data?.overall_avg_score ?? 0
+  const topicProgress = data?.topic_summaries ?? []
+  const studyPlan = data?.study_plan ?? []
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Your Dashboard</h1>
+    <div className={styles.container}>
+      {/* Welcome header */}
+      <div className={styles.welcomeSection}>
+        <div className={styles.welcomeText}>
+          <h1>Welcome, {user?.name ?? 'Pilot'}</h1>
+          <p>Let's ace your upcoming interviews. Here's your status today.</p>
+        </div>
+        <div className={styles.topActions}>
+          <Button
+            as="a"
+            href="/practice"
+            variant="secondary"
+            id="dash-practice-btn"
+          >
+            Practice Qs
+          </Button>
+          <Button
+            as="a"
+            href="/mock-interview/new"
+            variant="primary"
+            withBorder
+            id="dash-interview-btn"
+          >
+            Start Mock Session
+          </Button>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {progress.map((row) => {
-          const pct = row.avg_score !== null ? Math.round(row.avg_score * 100) : null
-          const color =
-            pct === null ? 'bg-gray-300'
-            : pct >= 80 ? 'bg-green-500'
-            : pct >= 60 ? 'bg-indigo-500'
-            : 'bg-amber-500'
-
-          return (
-            <div
-              key={row.id}
-              className="bg-white rounded-2xl shadow p-5 flex flex-col gap-2"
-            >
-              <h2 className="text-sm font-semibold text-gray-700">
-                {TOPIC_NAMES[row.topic_id] ?? 'Unknown Topic'}
-              </h2>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 bg-gray-100 rounded-full h-2">
-                  <div
-                    className={`${color} h-2 rounded-full transition-all`}
-                    style={{ width: pct !== null ? `${pct}%` : '0%' }}
-                  />
-                </div>
-                <span className="text-sm font-bold text-gray-800">
-                  {pct !== null ? `${pct}%` : '—'}
-                </span>
-              </div>
-              <p className="text-xs text-gray-400">
-                {row.attempts_count} attempt{row.attempts_count !== 1 ? 's' : ''}
+      <div className={styles.grid}>
+        {/* Main 2-column contents */}
+        <div className={styles.mainCol}>
+          
+          {/* Overview summary */}
+          <Card className={styles.overviewCard} variant="accent" padding="lg">
+            <ProgressRing value={overallAvg} size={110} label="Score" />
+            <div className={styles.overviewText}>
+              <h2 className={styles.overviewTitle}>Overall Preparedness</h2>
+              <p className={styles.overviewDesc}>
+                You have completed {data?.total_answers ?? 0} topic answers.
+                Your current weighted average score is {overallAvg}%. Keep practicing
+                your lowest-scoring modules to rank up your rating.
               </p>
             </div>
-          )
-        })}
+          </Card>
+
+          {/* Topic-wise breakdown */}
+          <div>
+            <div className={styles.sectionHeader}>
+              <h2 className={styles.sectionTitle}>Topics & Competencies</h2>
+              <Link to="/analytics" className="toggleLink" style={{ fontSize: '13px' }}>
+                View detailed charts →
+              </Link>
+            </div>
+            <div className={styles.topicsGrid}>
+              {topicProgress.map((tp, idx) => {
+                const color = TOPIC_COLORS[idx % TOPIC_COLORS.length]
+                return (
+                  <Card key={tp.topic_id} className={styles.topicCard}>
+                    <div className={styles.topicInfo}>
+                      <div>
+                        <span className={styles.topicName}>{tp.topic_name}</span>
+                        <p className={styles.topicMeta}>
+                          {tp.attempts_count} attempt{tp.attempts_count !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      <Badge variant={tp.avg_score >= 75 ? 'easy' : tp.avg_score >= 55 ? 'medium' : 'hard'}>
+                        {tp.avg_score >= 75 ? 'Strong' : tp.avg_score >= 55 ? 'Medium' : 'Weak'}
+                      </Badge>
+                    </div>
+
+                    <div className={styles.progressContainer}>
+                      <div className={styles.progressBarBg}>
+                        <div
+                          className={styles.progressBarFill}
+                          style={{
+                            width: `${tp.avg_score}%`,
+                            background: color,
+                          }}
+                        />
+                      </div>
+                      <span className={styles.progressLabel}>{Math.round(tp.avg_score)}%</span>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+
+        </div>
+
+        {/* Sidebar content */}
+        <div className={styles.sideCol}>
+          
+          {/* Recommended study priority */}
+          <div>
+            <h2 className={styles.sectionTitle} style={{ marginBottom: 'var(--space-4)' }}>
+              Priority Focus Areas
+            </h2>
+            <div className={styles.priorityList}>
+              {studyPlan.slice(0, 3).map((item) => (
+                <div key={item.topic_id} className={styles.priorityItem}>
+                  <span className={styles.priorityNum}>#{item.priority_rank}</span>
+                  <div style={{ flex: 1 }}>
+                    <span className={styles.priorityName}>{item.topic_name}</span>
+                    <p className={styles.priorityReason}>{item.reason}</p>
+                  </div>
+                </div>
+              ))}
+              {studyPlan.length > 0 && (
+                <Link
+                  to="/study-plan"
+                  className="toggleLink"
+                  style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center' }}
+                >
+                  View full resources & study plan →
+                </Link>
+              )}
+            </div>
+          </div>
+
+          {/* Recent sessions */}
+          <div>
+            <h2 className={styles.sectionTitle} style={{ marginBottom: 'var(--space-4)' }}>
+              Recent Sessions
+            </h2>
+            <div className={styles.mockList}>
+              {RECENT_INTERVIEWS.map((m) => (
+                <div key={m.id} className={styles.mockItem}>
+                  <div>
+                    <span className={styles.mockTitle}>{m.role}</span>
+                    <p className={styles.mockDate}>{m.date}</p>
+                  </div>
+                  <Badge variant="accent">{m.score}</Badge>
+                </div>
+              ))}
+              <Link
+                to="/history"
+                className="toggleLink"
+                style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center' }}
+              >
+                View all sessions →
+              </Link>
+            </div>
+          </div>
+
+        </div>
       </div>
     </div>
   )
