@@ -1,0 +1,171 @@
+/* Auth pages shared CSS (used by LogIn.module.css and SignUp.module.css via shared class names) */
+
+/* AuthPage.module.css */
+
+.page {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  background-image:
+    radial-gradient(ellipse 60% 70% at 15% 50%, rgba(160,104,255,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 60% at 85% 50%, rgba(100,60,200,0.07) 0%, transparent 50%);
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-12);
+  padding: calc(var(--nav-h) + var(--space-8)) var(--space-8) var(--space-8);
+}
+
+/* Decorative orbit ring (right side) */
+.deco {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scaleIn var(--enter-visual) var(--ease-out-expo) 0.3s both;
+}
+
+/* Form card */
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  backdrop-filter: blur(16px);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.logoRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  text-decoration: none;
+}
+
+.logoMark {
+  font-size: 24px;
+}
+
+.logoText {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.03em;
+}
+
+.logoAccent {
+  color: var(--accent);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: var(--space-2);
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-bottom: var(--space-6);
+}
+
+/* Form fields */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  color: var(--text-light);
+  font-size: var(--text-sm);
+  outline: none;
+  transition:
+    border-color var(--dur-fast) var(--ease-out-expo),
+    background var(--dur-fast) var(--ease-out-expo);
+}
+
+.input::placeholder {
+  color: var(--text-subtle);
+}
+
+.input:focus {
+  border-color: var(--accent);
+  background: rgba(160, 104, 255, 0.06);
+}
+
+.error {
+  background: rgba(248,113,113,0.1);
+  border: 1px solid rgba(248,113,113,0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--color-danger);
+}
+
+.submitBtn {
+  margin-top: var(--space-2);
+  width: 100%;
+  justify-content: center;
+}
+
+.toggle {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-4);
+}
+
+.toggleLink {
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-size: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast);
+}
+
+.toggleLink:hover {
+  color: #c4a2ff;
+}
+
+@media (max-width: 768px) {
+  .deco {
+    display: none;
+  }
+
+  .main {
+    padding-inline: var(--space-4);
+  }
+}
