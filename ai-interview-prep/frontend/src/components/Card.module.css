@@ -1,0 +1,71 @@
+/* Card.module.css */
+
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    border-color var(--dur-normal) var(--ease-out-expo),
+    transform var(--dur-normal) var(--ease-out-expo),
+    box-shadow var(--dur-normal) var(--ease-out-expo);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle top-edge gradient */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-dim), transparent);
+  opacity: 0;
+  transition: opacity var(--dur-normal) var(--ease-out-expo);
+}
+
+.card:hover {
+  border-color: var(--border-bright);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card);
+}
+
+.card:hover::before {
+  opacity: 1;
+}
+
+/* Variant: elevated — stronger shadow, no hover lift */
+.elevated {
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Variant: flat — no background, just border */
+.flat {
+  background: transparent;
+}
+
+/* Variant: accent — accent-tinted border on hover */
+.accent:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 24px var(--accent-dim);
+}
+
+/* Variant: nohover — no transform on hover (for static cards) */
+.nohover:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Padding variants */
+.sm {
+  padding: var(--space-4);
+}
+
+.lg {
+  padding: var(--space-8);
+}

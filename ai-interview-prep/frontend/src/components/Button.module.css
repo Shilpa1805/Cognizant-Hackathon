@@ -1,0 +1,165 @@
+/* Button.module.css — PrepPilot shared Button component */
+
+/* --------------------------------------------------
+   Border-wrap container (animated conic-gradient ring)
+   -------------------------------------------------- */
+.btnBorderWrap {
+  display: inline-block;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: conic-gradient(
+    from var(--border-angle),
+    transparent 0%,
+    var(--accent) 15%,
+    transparent 30%
+  );
+  animation: borderSpin 3s linear infinite;
+  position: relative;
+}
+
+.btnBorderWrap:focus-within {
+  outline: none;
+}
+
+/* --------------------------------------------------
+   Base button
+   -------------------------------------------------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 13px 28px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  border: none;
+  outline: none;
+  overflow: hidden;
+  transition:
+    color var(--dur-fast) var(--ease-out-expo),
+    transform var(--dur-fast) var(--ease-out-expo),
+    box-shadow var(--dur-normal) var(--ease-out-expo);
+  white-space: nowrap;
+  text-decoration: none;
+  z-index: 0;
+  isolation: isolate;
+}
+
+/* Slide-fill overlay — animates on hover */
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  z-index: -1;
+  transition: transform 0.35s var(--ease-out-expo);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* --------------------------------------------------
+   Primary variant — black fill, slide from right
+   -------------------------------------------------- */
+.primary {
+  background: #ffffff;
+  color: var(--text-dark);
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.1);
+}
+
+.primary::after {
+  background: var(--accent);
+  transform: translateX(101%);
+  transform-origin: right;
+}
+
+.primary:hover:not(:disabled)::after {
+  transform: translateX(0);
+}
+
+.primary:hover:not(:disabled) {
+  color: #ffffff;
+  box-shadow: var(--shadow-glow);
+}
+
+/* --------------------------------------------------
+   Secondary variant — outline, slide from left
+   -------------------------------------------------- */
+.secondary {
+  background: transparent;
+  color: var(--text-light);
+  border: 1.5px solid var(--border-bright);
+}
+
+.secondary::after {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateX(-101%);
+  transform-origin: left;
+}
+
+.secondary:hover:not(:disabled)::after {
+  transform: translateX(0);
+}
+
+.secondary:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* --------------------------------------------------
+   Accent variant — purple fill
+   -------------------------------------------------- */
+.accent {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 4px 20px rgba(160, 104, 255, 0.3);
+}
+
+.accent::after {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateX(101%);
+}
+
+.accent:hover:not(:disabled)::after {
+  transform: translateX(0);
+}
+
+.accent:hover:not(:disabled) {
+  box-shadow: 0 8px 32px rgba(160, 104, 255, 0.5);
+}
+
+/* --------------------------------------------------
+   Size variants
+   -------------------------------------------------- */
+.sm {
+  padding: 9px 20px;
+  font-size: var(--text-xs);
+}
+
+.lg {
+  padding: 16px 36px;
+  font-size: var(--text-base);
+}
+
+/* Icon inside button */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: 1.1em;
+}

@@ -1,0 +1,212 @@
+/* NavHeader.module.css — PrepPilot top navigation */
+
+.nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--nav-h);
+  display: flex;
+  align-items: center;
+  /* Glassmorphism blur on scroll */
+  background: rgba(6, 2, 24, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border-dim);
+  animation: fadeDown var(--enter-header) var(--ease-out-expo) both;
+}
+
+.inner {
+  width: 100%;
+  max-width: var(--max-w);
+  margin-inline: auto;
+  padding-inline: var(--nav-px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+/* --------------------------------------------------
+   Logo
+   -------------------------------------------------- */
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.logoMark {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: transform var(--dur-fast) var(--ease-out-expo);
+}
+
+.logo:hover .logoMark {
+  transform: rotate(-8deg) scale(1.08);
+}
+
+.logoText {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.03em;
+}
+
+.logoAccent {
+  color: var(--accent);
+}
+
+/* --------------------------------------------------
+   Nav links
+   -------------------------------------------------- */
+.links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.link {
+  position: relative;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out-expo);
+  padding-block: var(--space-2);
+}
+
+.link::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s ease;
+}
+
+.link:hover,
+.linkActive {
+  color: var(--text-light);
+}
+
+.link:hover::after,
+.linkActive::after {
+  transform: scaleX(1);
+}
+
+/* --------------------------------------------------
+   Right side: auth controls
+   -------------------------------------------------- */
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------
+   Avatar + dropdown (logged in)
+   -------------------------------------------------- */
+.avatarWrap {
+  position: relative;
+}
+
+.avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--accent) 0%, #6b21a8 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  border: 2px solid var(--border-dim);
+  transition:
+    border-color var(--dur-fast) var(--ease-out-expo),
+    transform var(--dur-fast) var(--ease-out-expo);
+}
+
+.avatar:hover {
+  border-color: var(--accent);
+  transform: scale(1.05);
+}
+
+.dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 180px;
+  background: var(--bg-dark-alt);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2);
+  box-shadow: var(--shadow-card);
+  animation: fadeUp 0.2s var(--ease-out-expo) both;
+}
+
+.dropdownItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    background var(--dur-fast) var(--ease-out-expo),
+    color var(--dur-fast) var(--ease-out-expo);
+  text-decoration: none;
+}
+
+.dropdownItem:hover {
+  background: var(--bg-card);
+  color: var(--text-light);
+}
+
+.dropdownDivider {
+  height: 1px;
+  background: var(--border-dim);
+  margin: var(--space-2);
+}
+
+/* --------------------------------------------------
+   Responsive — hide links on small screens
+   -------------------------------------------------- */
+@media (max-width: 768px) {
+  .inner {
+    padding-inline: var(--space-6);
+  }
+
+  .links {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .inner {
+    padding-inline: var(--space-4);
+  }
+
+  .logoText {
+    display: none;
+  }
+}

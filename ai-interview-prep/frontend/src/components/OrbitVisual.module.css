@@ -1,0 +1,170 @@
+/* OrbitVisual.module.css — PrepPilot animated orbit system */
+
+/* --------------------------------------------------
+   Root container
+   -------------------------------------------------- */
+.root {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* --------------------------------------------------
+   Orbit rings — gradient-border using mask technique
+   -------------------------------------------------- */
+.orbitsContainer {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orbit {
+  position: absolute;
+  border-radius: 50%;
+  /* Gradient border via box-shadow layering for performance */
+  border: 1.5px solid rgba(160, 104, 255, 0.2);
+  box-shadow: 0 0 0 1px rgba(160, 104, 255, 0.06);
+}
+
+.orbitCW {
+  animation: spinCW linear infinite;
+}
+
+.orbitCCW {
+  animation: spinCCW linear infinite;
+}
+
+/* --------------------------------------------------
+   Center circle (counter-display or stat)
+   -------------------------------------------------- */
+.center {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, rgba(160,104,255,0.25) 0%, rgba(6,2,24,0.85) 70%);
+  border: 1.5px solid rgba(160, 104, 255, 0.35);
+  box-shadow:
+    0 0 40px rgba(160, 104, 255, 0.2),
+    inset 0 0 30px rgba(160, 104, 255, 0.05);
+  text-align: center;
+}
+
+.centerStat {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-light);
+  line-height: 1;
+}
+
+.centerLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* --------------------------------------------------
+   Orbit tiles (topic icons)
+   -------------------------------------------------- */
+.tile {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-radius: 50%;
+  background: rgba(10, 5, 40, 0.9);
+  border: 1px solid rgba(160, 104, 255, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  animation: flyIn 0.6s var(--ease-out-expo) both;
+  cursor: default;
+  transition: transform 0.25s var(--ease-out-expo), border-color 0.25s;
+}
+
+.tile:hover {
+  transform: scale(1.12);
+  border-color: var(--accent);
+}
+
+.tileEmoji {
+  font-size: inherit;
+  line-height: 1;
+}
+
+.tileLabel {
+  font-size: 8px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+}
+
+/* Counter-rotate tiles so they stay upright as orbit spins */
+.tileInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* --------------------------------------------------
+   Ring mode (compact ProgressRing variant)
+   -------------------------------------------------- */
+.ringRoot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ringRoot svg {
+  transform: rotate(-90deg);
+}
+
+.ringBg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.06);
+}
+
+.ringFill {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1.2s var(--ease-out-expo);
+  filter: drop-shadow(0 0 6px rgba(160, 104, 255, 0.6));
+}
+
+.ringCenter {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.ringPct {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--text-light);
+  line-height: 1;
+}
+
+.ringSubLabel {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+  line-height: 1.2;
+  text-align: center;
+  max-width: 60px;
+}
