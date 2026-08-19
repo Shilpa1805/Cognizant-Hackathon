@@ -70,6 +70,25 @@ def _extract_missing_keywords(concept_result: Any) -> list[str]:
             value = concept_result.get(key)
             if value is not None:
                 return [str(item) for item in value][:5]
+    if isinstance(concept_result, (tuple, list)) and len(concept_result) >= 3:
+        value = concept_result[2]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item) for item in value][:5]
+    elif isinstance(concept_result, (tuple, list)) and len(concept_result) >= 2:
+        value = concept_result[1]
+        if isinstance(value, (list, tuple, set)):
+            return [str(item) for item in value][:5]
+    return []
+
+
+def _extract_matched_keywords(concept_result: Any) -> list[str]:
+    if concept_result is None:
+        return []
+    if isinstance(concept_result, dict):
+        for key in ("matched_keywords", "matched_concepts", "matched"):
+            value = concept_result.get(key)
+            if value is not None:
+                return [str(item) for item in value][:5]
     if isinstance(concept_result, (tuple, list)) and len(concept_result) >= 2:
         value = concept_result[1]
         if isinstance(value, (list, tuple, set)):
@@ -231,6 +250,7 @@ def submit_answer(payload: SubmitAnswerRequest, db: Session = Depends(get_db)) -
     fused_score_value = fuse_scores(embed_score_value, concept_score_value, judge_score)
     feedback_text = build_feedback_text(concept_result, judge_reasoning)
     missing_keywords = _extract_missing_keywords(concept_result)
+    matched_keywords = _extract_matched_keywords(concept_result)
 
     answer_row = Answer(
         session_id=payload.session_id,
@@ -249,6 +269,9 @@ def submit_answer(payload: SubmitAnswerRequest, db: Session = Depends(get_db)) -
         fused_score=fused_score_value,
         feedback_text=feedback_text,
         missing_keywords=missing_keywords,
+        answer_explanation=judge_reasoning,
+        connecting_keywords=matched_keywords,
+        tips_and_tricks=[],
     )
     db.add(score_row)
     db.commit()

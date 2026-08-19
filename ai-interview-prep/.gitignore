@@ -42,3 +42,5 @@ coverage/
 .coverage
 htmlcov/
 chroma_db/
+*.db
+*.sqlite3

@@ -4,7 +4,7 @@ ORM model: scores table.
 
 import uuid
 
-from sqlalchemy import Column, Float, Text, ForeignKey
+from sqlalchemy import Column, Float, Text, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.database import Base
@@ -26,4 +26,11 @@ class Score(Base):
     human_calibrated_score: float = Column(Float, nullable=True)
     feedback_text: str = Column(Text, nullable=True)
     # stored as JSON array of strings, e.g. ["CAP theorem", "consistency models"]
-    missing_keywords = Column(JSONB, nullable=True)
+    missing_keywords = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    answer_explanation: str = Column(Text, nullable=True)
+    # stored as JSON array of strings
+    connecting_keywords = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    # stored as JSON array of strings
+    tips_and_tricks = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
+

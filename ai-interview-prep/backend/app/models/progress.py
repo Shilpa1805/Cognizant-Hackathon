@@ -5,7 +5,7 @@ ORM models: topic_progress and study_plan tables.
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, Float, Integer, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Float, Integer, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from app.database import Base
@@ -42,5 +42,6 @@ class StudyPlan(Base):
     )
     priority_rank: int = Column(Integer, nullable=False)
     # JSON array of resource strings / URLs
-    recommended_resources = Column(JSONB, nullable=True)
+    recommended_resources = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
     generated_at: datetime = Column(DateTime, nullable=False, default=datetime.utcnow)
+

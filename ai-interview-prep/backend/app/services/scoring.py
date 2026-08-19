@@ -1,67 +1,233 @@
 """
-Scoring Service — STUB
-========================
-TODO(ML-scoring pair): Implement multi-signal scoring pipeline.
-
-Planned implementation:
-  1. similarity_score  — cosine similarity between answer and reference embeddings.
-  2. llm_judge_score   — prompt an LLM to rate the answer 0-1 against the rubric.
-  3. concept_match_score — extract key concepts from reference; check coverage in answer.
-  4. fused_score       — weighted average of the three signals above.
-  5. missing_keywords  — concepts present in reference but absent from answer.
-
-This module is intentionally empty. Add your implementations below.
+Scoring Service — 3-Signal Hybrid Scoring Engine
+=================================================
+1. Embedding Similarity Signal: Sentence-transformers (all-MiniLM-L6-v2) or TF-IDF Cosine similarity (100% offline).
+2. Concept Match Signal: spaCy / NLP concept extraction to evaluate coverage and missing_keywords.
+3. LLM Judge Signal: Gemini LLM rating for correctness, clarity, and structure.
+4. Fusion Step: Weighted combination into `fused_score`.
 """
 
-from typing import Optional
-from .concept_overlap import concept_overlap
+import os
+import re
+import json
+from typing import List, Tuple, Dict, Any, Optional
+
+# Signal 1: Sentence Transformers & Scikit-Learn
+try:
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    _st_model = SentenceTransformer("all-MiniLM-L6-v2")
+    HAS_SENTENCE_TRANSFORMERS = True
+except Exception as e:
+    HAS_SENTENCE_TRANSFORMERS = False
+    _st_model = None
+
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.metrics.pairwise import cosine_similarity
+    HAS_SKLEARN = True
+except ImportError:
+    HAS_SKLEARN = False
+
+# Signal 2: spaCy concept extraction
+try:
+    import spacy
+    try:
+        _nlp = spacy.load("en_core_web_sm")
+    except Exception:
+        _nlp = spacy.blank("en")
+    HAS_SPACY = True
+except ImportError:
+    HAS_SPACY = False
+
+# Signal 3: Gemini LLM
+try:
+    from google import genai
+    HAS_GENAI = True
+except ImportError:
+    HAS_GENAI = False
+
+
+def compute_similarity(text_a: str, text_b: str) -> float:
+    """
+    Embedding similarity signal — runs 100% offline, zero external API call.
+    Uses sentence-transformers if available, with TF-IDF / word overlap fallback.
+    """
+    if not text_a or not text_b:
+        return 0.0
+
+    if HAS_SENTENCE_TRANSFORMERS and _st_model is not None:
+        try:
+            emb_a = _st_model.encode(text_a)
+            emb_b = _st_model.encode(text_b)
+            norm_a = np.linalg.norm(emb_a)
+            norm_b = np.linalg.norm(emb_b)
+            if norm_a > 0 and norm_b > 0:
+                sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
+                return max(0.0, min(1.0, (sim + 1.0) / 2.0))
+        except Exception as exc:
+            print(f"SentenceTransformer similarity error: {exc}. Using TF-IDF fallback.")
+
+    if HAS_SKLEARN:
+        try:
+            vectorizer = TfidfVectorizer().fit_transform([text_a, text_b])
+            vectors = vectorizer.toarray()
+            sim = cosine_similarity([vectors[0]], [vectors[1]])[0][0]
+            return float(max(0.0, min(1.0, sim)))
+        except Exception:
+            pass
+
+    # Jaccard word-overlap fallback
+    words_a = set(re.findall(r'\w+', text_a.lower()))
+    words_b = set(re.findall(r'\w+', text_b.lower()))
+    if not words_a or not words_b:
+        return 0.0
+    intersection = words_a.intersection(words_b)
+    union = words_a.union(words_b)
+    return float(len(intersection) / len(union))
+
+
+def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[str], List[str]]:
+    """
+    Concept-overlap signal — extracts key concepts/noun phrases from reference answer
+    (via spaCy or regex heuristic) and checks presence in student answer.
+    Returns (concept_match_score, matched_keywords, missing_keywords).
+    """
+    if not reference_answer:
+        return (1.0, [], [])
+
+    concepts = []
+    if HAS_SPACY and _nlp:
+        try:
+            doc = _nlp(reference_answer)
+            if doc.has_annotation("DEP"):
+                for chunk in doc.noun_chunks:
+                    cleaned = chunk.text.strip().lower()
+                    if len(cleaned) > 3 and cleaned not in concepts:
+                        concepts.append(cleaned)
+        except Exception:
+            pass
+
+    if not concepts:
+        # Regex fallback for technical terms / key words
+        words = re.findall(r'\b[A-Za-z\-]{4,}\b', reference_answer)
+        stopwords = {"with", "from", "that", "this", "have", "which", "their", "there", "were", "what", "when", "where", "also", "using"}
+        concepts = list(set([w.lower() for w in words if w.lower() not in stopwords]))[:10]
+
+    if not concepts:
+        return (1.0, [], [])
+
+    ans_lower = answer_text.lower()
+    matched = []
+    missing = []
+
+    for c in concepts:
+        # Check direct or partial match
+        if c in ans_lower or any(part in ans_lower for part in c.split() if len(part) > 3):
+            matched.append(c)
+        else:
+            missing.append(c)
+
+    score = float(len(matched) / len(concepts)) if concepts else 1.0
+    return (round(score, 3), matched, missing)
+
+
+def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tuple[float, str, str, List[str]]:
+    """
+    LLM-judge signal — prompts Gemini LLM to rate correctness, clarity, and structure (0.0-1.0)
+    and return constructive feedback, answer explanation, and tips/tricks.
+    Returns (score, feedback, answer_explanation, tips_and_tricks).
+    """
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if HAS_GENAI and api_key:
+        try:
+            client = genai.Client(api_key=api_key)
+            prompt = (
+                f"Question: '{question_text}'\n"
+                f"Gold Reference Answer: '{reference_answer}'\n"
+                f"Candidate's Submitted Answer: '{answer_text}'\n\n"
+                f"Evaluate the candidate's answer for technical accuracy, completeness, and clarity.\n"
+                f"Respond ONLY with a JSON object containing:\n"
+                f"- 'score': float between 0.0 and 1.0\n"
+                f"- 'feedback': 2-3 sentences of constructive feedback.\n"
+                f"- 'answer_explanation': a 2-4 sentence plain-English breakdown of why the reference answer is correct/what it covers\n"
+                f"- 'tips_and_tricks': JSON array of 1-3 short actionable tips for answering this type of question well"
+            )
+
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+
+            if response and response.text:
+                cleaned = response.text.strip()
+                if cleaned.startswith("```json"):
+                    cleaned = cleaned.split("```json")[1].split("```")[0].strip()
+                elif cleaned.startswith("```"):
+                    cleaned = cleaned.split("```")[1].split("```")[0].strip()
+
+                data = json.loads(cleaned)
+                score = float(data.get("score", 0.70))
+                feedback = str(data.get("feedback", "Good effort! Your response addresses the question."))
+                answer_explanation = str(data.get("answer_explanation", ""))
+                tips_raw = data.get("tips_and_tricks", [])
+                tips_and_tricks = [str(t) for t in tips_raw] if isinstance(tips_raw, list) else []
+                return (max(0.0, min(1.0, score)), feedback, answer_explanation, tips_and_tricks)
+        except Exception as exc:
+            print(f"LLM Judge error: {exc}. Using heuristic rating.")
+
+    # Fallback heuristic judge when LLM is unavailable
+    words_count = len(answer_text.split())
+    if words_count < 5:
+        score = 0.30
+        feedback = "Your answer is very brief. Provide more explanation and technical detail."
+    elif words_count < 15:
+        score = 0.60
+        feedback = "Solid basic answer. Consider expanding on trade-offs and specific examples."
+    else:
+        score = 0.80
+        feedback = "Good, detailed response covering key points."
+
+    answer_explanation = ""
+    tips_and_tricks = []
+    return (score, feedback, answer_explanation, tips_and_tricks)
+
 
 def score_answer(
     answer_text: str,
     reference_answer: str,
     question_text: str,
-) -> dict:
+) -> Dict[str, Any]:
     """
-    TODO(ML-scoring pair): Run the full multi-signal scoring pipeline.
-
-    Args:
-        answer_text: The candidate's raw answer.
-        reference_answer: The gold-standard reference answer from the DB.
-        question_text: The question being answered (used by LLM judge for context).
-
-    Returns:
-        A dict with keys: similarity_score, llm_judge_score, concept_match_score,
-        fused_score, feedback_text, missing_keywords (list[str]).
+    Full 3-signal scoring pipeline + fusion step.
+    Combines similarity_score, concept_match_score, and llm_judge_score into fused_score.
+    Returns dict matching Score ORM model fields.
     """
-    concept_result = concept_overlap(
-        answer_text,
-        reference_answer
-)
+    # 1. Similarity Score (offline)
+    sim_score = compute_similarity(answer_text, reference_answer or question_text)
 
-    concept_match_score = concept_result["score"]
-    missing_concepts = concept_result["missing_concepts"]
-    raise NotImplementedError("scoring.score_answer is not yet implemented.")
+    # 2. Concept Match Score & missing_keywords
+    concept_score, matched, missing = concept_match(answer_text, reference_answer or question_text)
 
+    # 3. LLM Judge Score & feedback_text
+    judge_score, feedback, explanation, tips = llm_judge(answer_text, reference_answer or "", question_text or "")
 
-def compute_similarity(text_a: str, text_b: str) -> float:
-    """
-    TODO(ML-scoring pair): Embed both texts and return cosine similarity in [0, 1].
-    """
-    raise NotImplementedError("scoring.compute_similarity is not yet implemented.")
+    # 4. Signal Fusion Step
+    # Weights: 0.35 similarity + 0.35 concept match + 0.30 LLM judge
+    fused_score = round(
+        (0.35 * sim_score) + (0.35 * concept_score) + (0.30 * judge_score),
+        3
+    )
 
-
-def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> float:
-    """
-    TODO(ML-scoring pair): Call an LLM to rate answer quality in [0, 1].
-    """
-    raise NotImplementedError("scoring.llm_judge is not yet implemented.")
-
-
-def concept_match(answer_text: str, reference_answer: str) -> tuple[float, list]:
-    """
-    TODO(ML-scoring pair): Extract key concepts from reference and compute coverage.
-
-    Returns:
-        Tuple of (concept_match_score, missing_keywords_list).
-    """
-    raise NotImplementedError("scoring.concept_match is not yet implemented.")
+    return {
+        "similarity_score": round(sim_score, 3),
+        "concept_match_score": round(concept_score, 3),
+        "llm_judge_score": round(judge_score, 3),
+        "fused_score": fused_score,
+        "human_calibrated_score": None,
+        "feedback_text": feedback,
+        "missing_keywords": missing,
+        "matched_keywords": matched,
+        "answer_explanation": explanation,
+        "tips_and_tricks": tips,
+    }
