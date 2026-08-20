@@ -5,7 +5,7 @@ ORM models: job_roles and topics tables.
 import uuid
 
 from sqlalchemy import Column, String, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import Uuid as UUID
 from sqlalchemy.orm import relationship
 
 from app.database import Base

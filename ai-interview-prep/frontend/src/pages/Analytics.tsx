@@ -41,7 +41,7 @@ export default function Analytics() {
     const load = async () => {
       try {
         const [dashRes, sessRes] = await Promise.all([
-          api.get('/dashboard/summary').catch(() => ({ data: null })),
+          api.get('/dashboard/summary', { params: { user_id: userId } }).catch(() => ({ data: null })),
           api.get('/sessions', { params: { user_id: userId } }).catch(() => ({ data: [] })),
         ])
         setDashData(dashRes.data)

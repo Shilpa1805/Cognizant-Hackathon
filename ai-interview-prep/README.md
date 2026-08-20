@@ -44,8 +44,7 @@ Make sure all of the following are installed before starting:
 | **npm** | 9+ | Bundled with Node.js |
 | **Git** | any | https://git-scm.com |
 
-> **Optional (for PostgreSQL):** If you want a persistent production-grade database instead of SQLite, install [PostgreSQL 15+](https://www.postgresql.org/download/).
-> The app works out of the box with the bundled SQLite file (`backend/interview_prep.db`) — no Postgres required for local dev.
+> The app works out of the box with the bundled SQLite file (`backend/interview_prep.db`) — zero config database setup!
 
 ---
 
@@ -107,9 +106,8 @@ cp .env.example .env
 Open `.env` and fill in your values:
 
 ```env
-# For local dev — SQLite is pre-configured, no change needed
-# To use PostgreSQL instead, replace with your connection string:
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/interview_prep
+# Database connection string (SQLite)
+DATABASE_URL=sqlite:///./interview_prep.db
 
 # Change this to a long random string in production
 JWT_SECRET=CHANGE_ME_TO_A_LONG_RANDOM_STRING
@@ -128,14 +126,9 @@ APP_ENV=development
 > 🔑 **Getting a Google Gemini API key:**
 > Visit [Google AI Studio](https://aistudio.google.com/app/apikey), sign in, and create a free API key. Paste it into `.env` as `GOOGLE_API_KEY`.
 
-#### 2d. Run database migrations (PostgreSQL only)
+#### 2d. Database Initialization
 
-If you are using PostgreSQL, run Alembic migrations:
-```bash
-alembic upgrade head
-```
-
-If you are using the default **SQLite** setup, skip this step — the database is created automatically on first server start.
+The database is created automatically on first server start. No manual migrations are required.
 
 #### 2e. Start the backend API server
 
@@ -306,7 +299,7 @@ Interactive docs: **http://localhost:8000/docs**
 
 ## 🗄️ Database
 
-The app uses **SQLite by default** (zero-config) and is fully compatible with **PostgreSQL** for production.
+The app uses **SQLite** natively with `interview_prep.db` for simple, zero-config development and production.
 
 10 core tables: `users` · `job_roles` · `topics` · `questions` · `mock_sessions` · `session_questions` · `answers` · `scores` · `topic_progress` · `study_plan`
 
@@ -340,7 +333,7 @@ For offline ML experimentation, see [`ml/README.md`](ml/README.md).
 | `backend/app/services/question_generation.py` + `vector_store.py` | LLM question gen + ChromaDB retrieval |
 | `frontend/src/` | React pages, CSS modules, API integration |
 | `ml/` | Data ingestion, embeddings, offline evaluation |
-| `backend/alembic/` | DB migrations |
+| `backend/alembic/` | DB migrations (historical) |
 
 ---
 

@@ -150,14 +150,7 @@ export default function Practice() {
         <Card variant="nohover" style={{ maxWidth: 560, margin: '0 auto', padding: 'var(--space-8)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-            {/* Role */}
-            <div className={styles.filterGroup}>
-              <label className={styles.filterLabel}>Target Role</label>
-              <select value={role} onChange={e => setRole(e.target.value)} className={styles.select}>
-                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-
+            {/* Role is automatically set from onboarding profile */}
             {/* Topic */}
             <div className={styles.filterGroup}>
               <label className={styles.filterLabel}>Topic</label>

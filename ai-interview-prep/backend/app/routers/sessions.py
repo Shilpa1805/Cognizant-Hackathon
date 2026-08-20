@@ -48,10 +48,20 @@ def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> S
         db.add(session)
         db.commit()
         db.refresh(session)
-    except Exception:
+    except Exception as exc:
         db.rollback()
-        # Fallback: return a non-persisted session so the flow doesn't break
-        session.session_id = uuid.uuid4()
+        import logging
+        logging.getLogger(__name__).warning("Failed to persist session: %s", exc)
+        # Return a non-persisted session so the flow doesn't break
+        return SessionOut(
+            session_id=session.session_id,
+            user_id=payload.user_id,
+            role_id=role_id,
+            started_at=datetime.utcnow(),
+            ended_at=None,
+            status="active",
+            session_type=payload.session_type,
+        )
 
     return SessionOut(
         session_id=session.session_id,

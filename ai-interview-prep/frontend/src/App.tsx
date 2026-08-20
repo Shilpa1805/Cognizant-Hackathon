@@ -1,5 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './hooks/useAuth'
 
 // Layout shell (provides NavHeader, main container, and Footer)
 import Layout from './components/Layout'
@@ -10,7 +11,6 @@ import LogIn         from './pages/LogIn'
 import SignUp        from './pages/SignUp'
 import Onboarding    from './pages/Onboarding'
 import Resources     from './pages/Resources'
-import Pricing       from './pages/Pricing'
 import Dashboard     from './pages/Dashboard'
 import Practice      from './pages/Practice'
 import MockInterview from './pages/MockInterview'
@@ -21,18 +21,28 @@ import History       from './pages/History'
 import StudyPlan     from './pages/StudyPlan'
 import SessionAnalysis from './pages/SessionAnalysis'
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth()
+  const location = useLocation()
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+  return <>{children}</>
+}
+
 function AppRoutes() {
   return (
     <Routes>
       {/* ── Standalone Landing Page ────────────────── */}
       <Route path="/" element={<Landing />} />
 
-      {/* ── Auth pages (optional for testing) ──────── */}
+      {/* ── Auth pages ─────────────────────────────── */}
       <Route path="/login" element={<LogIn />} />
       <Route path="/signup" element={<SignUp />} />
 
-      {/* ── All Main App Pages (Wrapped with NavHeader + Footer) ── */}
-      <Route element={<Layout />}>
+      {/* ── All Main App Pages (Protected & Wrapped) ── */}
+      <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard"           element={<Dashboard />} />
         <Route path="/practice"            element={<Practice />} />
         <Route path="/practice/analysis"   element={<SessionAnalysis />} />
@@ -41,7 +51,6 @@ function AppRoutes() {
         <Route path="/feedback/:sessionId" element={<Feedback />} />
         <Route path="/analytics"           element={<Analytics />} />
         <Route path="/resources"           element={<Resources />} />
-        <Route path="/pricing"             element={<Pricing />} />
         <Route path="/profile"             element={<Profile />} />
         <Route path="/history"             element={<History />} />
         <Route path="/study-plan"          element={<StudyPlan />} />

@@ -59,34 +59,36 @@ const DEFAULT_DEMO_TOKEN = 'demo-jwt-token'
  * AuthProvider — provides default demo user so all features can be demonstrated smoothly.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string>(() => {
-    return localStorage.getItem(TOKEN_KEY) || DEFAULT_DEMO_TOKEN
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem(TOKEN_KEY)
   })
-  const [user, setUser] = useState<AuthUser>(() => {
+  const [user, setUser] = useState<AuthUser | null>(() => {
     try {
       const stored = localStorage.getItem(USER_KEY)
-      return stored ? JSON.parse(stored) : DEFAULT_DEMO_USER
+      return stored ? JSON.parse(stored) : null
     } catch {
-      return DEFAULT_DEMO_USER
+      return null
     }
   })
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => {
     const stored = localStorage.getItem(ONBOARDING_KEY)
-    return stored ? stored === 'true' : true
+    return stored === 'true'
   })
-  const [onboardingData, setOnboardingData] = useState<OnboardingData>(() => {
+  const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(() => {
     try {
       const stored = localStorage.getItem(ONBOARDING_DATA_KEY)
-      return stored ? JSON.parse(stored) : DEFAULT_ONBOARDING_DATA
+      return stored ? JSON.parse(stored) : null
     } catch {
-      return DEFAULT_ONBOARDING_DATA
+      return null
     }
   })
 
-  // Ensure default tokens are available for api client interceptor
+  // Set default auth interceptor token
   useEffect(() => {
-    if (!localStorage.getItem('access_token')) {
+    if (token) {
       localStorage.setItem('access_token', token)
+    } else {
+      localStorage.removeItem('access_token')
     }
   }, [token])
 
@@ -99,13 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    // In demo mode, resetting resets to demo user
-    setUser(DEFAULT_DEMO_USER)
-    setToken(DEFAULT_DEMO_TOKEN)
-    setOnboardingComplete(true)
-    setOnboardingData(DEFAULT_ONBOARDING_DATA)
+    setUser(null)
+    setToken(null)
+    setOnboardingComplete(false)
+    setOnboardingData(null)
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(ONBOARDING_KEY)
+    localStorage.removeItem(ONBOARDING_DATA_KEY)
+    localStorage.removeItem('access_token')
   }, [])
 
   const completeOnboarding = useCallback((data: OnboardingData) => {
@@ -118,11 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user,
-        token,
-        isAuthenticated: true,
+        user: user as AuthUser, // Only used when authenticated
+        token: token as string,
+        isAuthenticated: !!token && !!user,
         onboardingComplete,
-        onboardingData,
+        onboardingData: onboardingData as OnboardingData, // Only used when onboarded
         login,
         logout,
         completeOnboarding,

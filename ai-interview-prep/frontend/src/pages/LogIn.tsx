@@ -21,6 +21,7 @@ export default function LogIn() {
   // Step 1: enter name | Step 2: pick role
   const [step, setStep] = useState<1 | 2>(1)
   const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
   const [selectedRole, setSelectedRole] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,6 +29,7 @@ export default function LogIn() {
   const handleNameSubmit = (e: FormEvent) => {
     e.preventDefault()
     if (!name.trim()) { setError('Please enter your name.'); return }
+    if (!email.trim() || !email.includes('@')) { setError('Please enter a valid email.'); return }
     setError(null)
     setStep(2)
   }
@@ -36,20 +38,47 @@ export default function LogIn() {
     setSelectedRole(roleId)
   }
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (!selectedRole) { setError('Please select a role to continue.'); return }
     setLoading(true)
 
-    // Build a demo user with the chosen name and role
-    const demoUser = {
-      user_id: '00000000-0000-0000-0000-000000000002',
-      name: name.trim(),
-      email: `${name.trim().toLowerCase().replace(/\s+/g, '.')}@demo.prepiq.ai`,
-      role: 'candidate',
-      created_at: new Date().toISOString(),
+    const dummyPassword = 'demo-clerk-password-123!'
+    let userData = null
+    let accessToken = 'demo-jwt-token'
+
+    try {
+      // Try to register the user so the backend has their user_id
+      const { data } = await api.post('/auth/signup', {
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        password: dummyPassword,
+        role: 'candidate'
+      })
+      userData = data.user
+      accessToken = data.access_token
+    } catch (err: any) {
+      // If email exists, just log them in
+      if (err.response?.status === 400 || err.response?.status === 409) {
+        try {
+          const { data } = await api.post('/auth/login', {
+            email: email.trim().toLowerCase(),
+            password: dummyPassword,
+          })
+          userData = data.user
+          accessToken = data.access_token
+        } catch (loginErr: any) {
+           setError('Failed to setup session. Please try another email.')
+           setLoading(false)
+           return
+        }
+      } else {
+        setError('Failed to setup session. Please try again.')
+        setLoading(false)
+        return
+      }
     }
 
-    login('demo-jwt-token', demoUser)
+    login(accessToken, userData)
 
     // Save onboarding data with selected role so Practice/Mock can pre-fill it
     completeOnboarding({
@@ -86,6 +115,19 @@ export default function LogIn() {
                     className={styles.input}
                     placeholder="e.g. Priya Sharma"
                     autoFocus
+                  />
+                </div>
+
+                <div className={styles.field} style={{ marginTop: '16px' }}>
+                  <label htmlFor="login-email" className={styles.label}>Your Email</label>
+                  <input
+                    id="login-email"
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={styles.input}
+                    placeholder="e.g. priya@example.com"
                   />
                 </div>
 

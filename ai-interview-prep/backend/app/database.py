@@ -4,7 +4,7 @@ Import `get_db` into routers to obtain a database session.
 """
 
 import logging
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from app.config import settings
@@ -12,48 +12,30 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def resolve_database_url() -> str:
-    """Returns the DB URL actually usable — Postgres if reachable,
-    otherwise a local SQLite fallback. Used by both the app and
-    Alembic so they always agree on which database is live."""
-    raw_url = settings.DATABASE_URL
-    if "sqlite" in raw_url:
-        return raw_url
-
-    try:
-        temp_engine = create_engine(
-            raw_url,
-            pool_pre_ping=True,
-        )
-        with temp_engine.connect() as conn:
-            pass
-        return raw_url
-    except Exception as exc:
-        logger.warning("PostgreSQL connection error: %s. Falling back to SQLite.", exc)
-        return "sqlite:///interview_prep.db"
-
-
 # ---------------------------------------------------------------------------
-# Engine
+# Engine — SQLite only
 # ---------------------------------------------------------------------------
-db_url = resolve_database_url()
+db_url = settings.DATABASE_URL
 
-if "sqlite" in db_url:
-    engine = create_engine(
-        db_url,
-        connect_args={"check_same_thread": False},
-    )
-else:
-    engine = create_engine(
-        db_url,
-        pool_pre_ping=True,
-    )
+engine = create_engine(
+    db_url,
+    connect_args={"check_same_thread": False},
+)
+
+
+# Enable WAL mode and foreign-key enforcement for SQLite
+@event.listens_for(engine, "connect")
+def set_sqlite_pragmas(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
 
 # ---------------------------------------------------------------------------
 # Session factory
 # ---------------------------------------------------------------------------
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 
 
 # ---------------------------------------------------------------------------

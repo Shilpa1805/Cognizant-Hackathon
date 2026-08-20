@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, Float, Integer, DateTime, ForeignKey, Text, JSON
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.types import Uuid as UUID
 
 from app.database import Base
 
@@ -42,6 +42,5 @@ class StudyPlan(Base):
     )
     priority_rank: int = Column(Integer, nullable=False)
     # JSON array of resource strings / URLs
-    recommended_resources = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    recommended_resources = Column(JSON, nullable=True)
     generated_at: datetime = Column(DateTime, nullable=False, default=datetime.utcnow)
-

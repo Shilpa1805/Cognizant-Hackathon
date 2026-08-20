@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # -----------------------------------------------------------------------
     # Database
     # -----------------------------------------------------------------------
-    DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/interview_prep"
+    DATABASE_URL: str = "sqlite:///./interview_prep.db"
 
     # -----------------------------------------------------------------------
     # JWT  (stub values — auth pair will replace with real secret management)

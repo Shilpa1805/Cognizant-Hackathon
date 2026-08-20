@@ -200,12 +200,7 @@ export default function MockInterview() {
         <Card variant="nohover" style={{ maxWidth: 560, margin: '0 auto', padding: 'var(--space-8)' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
 
-            <div>
-              <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Target Role</label>
-              <select value={role} onChange={e => setRole(e.target.value)} className={styles.select}>
-                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
+            {/* Role is automatically set from onboarding profile */}
 
             <div>
               <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Topic</label>

@@ -5,7 +5,7 @@ ORM model: questions table.
 import uuid
 
 from sqlalchemy import Column, String, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.types import Uuid as UUID
 
 from app.database import Base
 

@@ -51,10 +51,13 @@ def _build_recommended_focus(avg_score: float, question_frequency: int) -> str:
 
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryOut)
-def get_dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummaryOut:
+def get_dashboard_summary(
+    user_id: uuid.UUID, 
+    db: Session = Depends(get_db)
+) -> DashboardSummaryOut:
     """
     Pod 3 core endpoint for PrepIQ dashboard.
-    Uses a hardcoded demo user and computes topic averages from Score rows.
+    Computes topic averages from Score rows for the specified user.
     """
     score_value = func.coalesce(ScoreModel.human_calibrated_score, ScoreModel.fused_score)
 
@@ -79,7 +82,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummaryOut:
         .join(ScoreModel, ScoreModel.answer_id == AnswerModel.answer_id)
         .join(topic_frequency_subquery, topic_frequency_subquery.c.topic_id == TopicModel.topic_id)
         .filter(
-            AnswerModel.user_id == DEFAULT_USER_ID,
+            AnswerModel.user_id == user_id,
             score_value.isnot(None),
         )
         .group_by(
@@ -131,11 +134,11 @@ def get_dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummaryOut:
             AnswerModel,
             and_(
                 AnswerModel.session_id == MockSessionModel.session_id,
-                AnswerModel.user_id == DEFAULT_USER_ID,
+                AnswerModel.user_id == user_id,
             ),
         )
         .outerjoin(ScoreModel, ScoreModel.answer_id == AnswerModel.answer_id)
-        .filter(MockSessionModel.user_id == DEFAULT_USER_ID)
+        .filter(MockSessionModel.user_id == user_id)
         .group_by(
             MockSessionModel.session_id,
             MockSessionModel.started_at,
@@ -160,7 +163,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummaryOut:
     ]
 
     return DashboardSummaryOut(
-        user_id=DEFAULT_USER_ID,
+        user_id=user_id,
         topic_average_scores=topic_average_scores,
         study_plan=study_plan,
         session_history=session_history,
@@ -195,7 +198,7 @@ def get_study_plan(user_id: uuid.UUID, db: Session = Depends(get_db)) -> List[St
     if persisted_plan:
         return persisted_plan
 
-    summary = get_dashboard_summary(db=db)
+    summary = get_dashboard_summary(user_id=user_id, db=db)
 
     return [
         StudyPlanOut(
