@@ -207,11 +207,11 @@ export default function Dashboard() {
               ))}
               {studyPlan.length > 0 && (
                 <Link
-                  to="/study-plan"
+                  to="/priority-plan"
                   className="toggleLink"
                   style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center' }}
                 >
-                  View full resources & study plan →
+                  View Priority Plan →
                 </Link>
               )}
             </div>

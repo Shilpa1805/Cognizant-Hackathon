@@ -16,7 +16,6 @@ interface NavHeaderProps {
 const DEFAULT_LOGGED_OUT_LINKS: NavLink_[] = [
   { to: '/practice',      label: 'Practice' },
   { to: '/mock-interview/new', label: 'Mock Interviews' },
-  { to: '/resources',    label: 'Resources' },
 ]
 
 const DEFAULT_LOGGED_IN_LINKS: NavLink_[] = [
@@ -25,7 +24,7 @@ const DEFAULT_LOGGED_IN_LINKS: NavLink_[] = [
   { to: '/practice',           label: 'Practice' },
   { to: '/mock-interview/new', label: 'Mock Interview' },
   { to: '/analytics',          label: 'Analytics' },
-  { to: '/resources',          label: 'Resources' },
+  { to: '/priority-plan',      label: 'Priority Plan' },
 ]
 
 /**

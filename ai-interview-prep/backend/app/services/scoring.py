@@ -161,11 +161,11 @@ def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[
     return (round(score, 3), matched, missing)
 
 
-def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tuple[float, str, str, List[str]]:
+def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tuple[float, str, str, List[str], List[str]]:
     """
     LLM-judge signal — prompts Gemini LLM to rate correctness, clarity, and structure (0.0-1.0)
-    and return constructive feedback, answer explanation, and tips/tricks.
-    Returns (score, feedback, answer_explanation, tips_and_tricks).
+    and return constructive feedback, answer explanation, tips/tricks, and missing concepts.
+    Returns (score, feedback, answer_explanation, tips_and_tricks, missing_concepts).
     """
     try:
         from app.config import settings
@@ -184,7 +184,8 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                 f"- 'score': float between 0.0 and 1.0\n"
                 f"- 'feedback': 2-3 sentences of constructive feedback.\n"
                 f"- 'answer_explanation': a 2-4 sentence plain-English breakdown of why the reference answer is correct/what it covers\n"
-                f"- 'tips_and_tricks': JSON array of 1-3 short actionable tips for answering this type of question well"
+                f"- 'tips_and_tricks': JSON array of 1-3 short actionable tips for answering this type of question well\n"
+                f"- 'missing_concepts': JSON array of 1-3 short keywords (e.g. 'load balancing', 'cache') that the candidate missed from the reference answer. If none, return empty array."
             )
 
             response = None
@@ -212,7 +213,9 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                 answer_explanation = str(data.get("answer_explanation", ""))
                 tips_raw = data.get("tips_and_tricks", [])
                 tips_and_tricks = [str(t) for t in tips_raw] if isinstance(tips_raw, list) else []
-                return (max(0.0, min(1.0, score)), feedback, answer_explanation, tips_and_tricks)
+                missing_raw = data.get("missing_concepts", [])
+                missing_concepts = [str(m) for m in missing_raw] if isinstance(missing_raw, list) else []
+                return (max(0.0, min(1.0, score)), feedback, answer_explanation, tips_and_tricks, missing_concepts)
         except Exception as exc:
             logger.warning(
                 "LLM Judge Gemini call failed (%s: %s). Falling back to heuristic.",
@@ -254,7 +257,8 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
 
     answer_explanation = ""
     tips_and_tricks    = []
-    return (score, feedback, answer_explanation, tips_and_tricks)
+    missing_concepts   = []
+    return (score, feedback, answer_explanation, tips_and_tricks, missing_concepts)
 
 
 def score_answer(
@@ -284,7 +288,7 @@ def score_answer(
     concept_score, matched, missing = concept_match(answer_text, reference_answer or question_text)
 
     # 3. LLM Judge Score & feedback_text
-    judge_score, feedback, explanation, tips = llm_judge(answer_text, reference_answer or "", question_text or "")
+    judge_score, feedback, explanation, tips, missing_concepts = llm_judge(answer_text, reference_answer or "", question_text or "")
 
     # 4. Signal Fusion Step
     # Weights: 0.35 similarity + 0.35 concept match + 0.30 LLM judge
@@ -300,7 +304,7 @@ def score_answer(
         "fused_score": fused_score,
         "human_calibrated_score": None,
         "feedback_text": feedback,
-        "missing_keywords": missing,
+        "missing_keywords": missing_concepts if missing_concepts else missing,
         "matched_keywords": matched,
         "answer_explanation": explanation,
         "tips_and_tricks": tips,

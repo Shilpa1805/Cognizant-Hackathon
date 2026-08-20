@@ -10,7 +10,6 @@ import Landing       from './pages/Landing'
 import LogIn         from './pages/LogIn'
 import SignUp        from './pages/SignUp'
 import Onboarding    from './pages/Onboarding'
-import Resources     from './pages/Resources'
 import Dashboard     from './pages/Dashboard'
 import Practice      from './pages/Practice'
 import MockInterview from './pages/MockInterview'
@@ -18,7 +17,7 @@ import Feedback      from './pages/Feedback'
 import Analytics     from './pages/Analytics'
 import Profile       from './pages/Profile'
 import History       from './pages/History'
-import StudyPlan     from './pages/StudyPlan'
+import PriorityPlan  from './pages/PriorityPlan'
 import SessionAnalysis from './pages/SessionAnalysis'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -50,10 +49,9 @@ function AppRoutes() {
         <Route path="/mock/analysis"       element={<SessionAnalysis />} />
         <Route path="/feedback/:sessionId" element={<Feedback />} />
         <Route path="/analytics"           element={<Analytics />} />
-        <Route path="/resources"           element={<Resources />} />
         <Route path="/profile"             element={<Profile />} />
         <Route path="/history"             element={<History />} />
-        <Route path="/study-plan"          element={<StudyPlan />} />
+        <Route path="/priority-plan"       element={<PriorityPlan />} />
         <Route path="/onboarding"          element={<Onboarding />} />
       </Route>
 
