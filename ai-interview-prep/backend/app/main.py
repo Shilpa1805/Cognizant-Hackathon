@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.config import settings
 from app.database import engine, Base, SessionLocal
 from app.models.user import User
-from app.routers import auth, questions, sessions, answers, scores, dashboard
+from app.routers import auth, questions, sessions, answers, scores, dashboard, calibration
 from app.seed import seed_database
 
 logger = logging.getLogger(__name__)
@@ -58,13 +58,14 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
-app.include_router(auth.router,      prefix="/auth",       tags=["auth"])
-app.include_router(questions.router, prefix="/questions",  tags=["questions"])
-app.include_router(sessions.router,  prefix="/sessions",   tags=["sessions"])
-app.include_router(answers.router,   prefix="/sessions",   tags=["answers"])
-app.include_router(answers.router,   prefix="/answers",    tags=["answers"])
-app.include_router(scores.router,    prefix="/scores",     tags=["scores"])
-app.include_router(dashboard.router, prefix="",            tags=["dashboard"])
+app.include_router(auth.router,        prefix="/auth",        tags=["auth"])
+app.include_router(questions.router,   prefix="/questions",   tags=["questions"])
+app.include_router(sessions.router,    prefix="/sessions",    tags=["sessions"])
+app.include_router(answers.router,     prefix="/sessions",    tags=["answers"])
+app.include_router(answers.router,     prefix="/answers",     tags=["answers"])
+app.include_router(scores.router,      prefix="/scores",      tags=["scores"])
+app.include_router(calibration.router, prefix="/calibration", tags=["calibration"])
+app.include_router(dashboard.router,   prefix="",             tags=["dashboard"])
 
 
 # ---------------------------------------------------------------------------
