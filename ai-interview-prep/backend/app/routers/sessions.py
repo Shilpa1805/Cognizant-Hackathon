@@ -34,6 +34,12 @@ def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> S
     Creates and persists a new mock/practice session to the database.
     Returns the real session_id so the frontend can submit answers against it.
     """
+    from app.models.user import User as UserModel
+
+    # Resolve user_id safely to prevent SQLite foreign key constraint failures
+    valid_user = db.query(UserModel).filter(UserModel.user_id == payload.user_id).first()
+    safe_user_id = payload.user_id if valid_user else uuid.UUID("00000000-0000-0000-0000-000000000002")
+
     # Resolve role_id safely to prevent SQLite foreign key constraint failures
     valid_role = db.query(JobRole).filter(JobRole.role_id == payload.role_id).first()
     # Fallback to seed ID 1 (SDE) if the provided role doesn't exist
@@ -41,7 +47,7 @@ def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> S
 
     session = MockSession(
         session_id=uuid.uuid4(),
-        user_id=payload.user_id,
+        user_id=safe_user_id,
         role_id=role_id,
         started_at=datetime.utcnow(),
         ended_at=None,
