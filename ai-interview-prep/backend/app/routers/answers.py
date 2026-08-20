@@ -21,6 +21,7 @@ from app.models.answer import Answer as AnswerModel
 from app.models.score import Score as ScoreModel
 from app.models.session import MockSession
 from app.models.question import Question
+from app.dependencies.auth import verify_clerk_token
 
 router = APIRouter()
 
@@ -31,6 +32,7 @@ def submit_answer(
     payload: AnswerCreate,
     session_id: Optional[uuid.UUID] = None,
     db: DbSession = Depends(get_db),
+    user=Depends(verify_clerk_token),
 ) -> ScoreOut:
     """
     Submits an answer, runs the 3-signal ML scoring pipeline, persists Answer + Score to DB,
@@ -171,7 +173,7 @@ def submit_answer(
 
 
 @router.post("/{session_id}/answers/followup", response_model=QuestionOut)
-def generate_followup(session_id: uuid.UUID, payload: FollowUpRequest) -> QuestionOut:
+def generate_followup(session_id: uuid.UUID, payload: FollowUpRequest, user=Depends(verify_clerk_token)) -> QuestionOut:
     """
     Generates an adaptive follow-up question based on the user's answer and their score.
     If Gemini is unavailable, it returns a 503 since this is a purely generative feature.

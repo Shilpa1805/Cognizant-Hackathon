@@ -1,5 +1,7 @@
-import { createContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useState, useEffect, useCallback, useMemo } from 'react'
 import type { ReactNode } from 'react'
+import { useUser, useAuth } from '@clerk/clerk-react'
+import { mapClerkIdToUUID } from '../lib/clerkMapping'
 
 // ------------------------------------------------------------------
 // Types — match backend AuthResponse exactly
@@ -20,11 +22,11 @@ export interface OnboardingData {
 }
 
 interface AuthContextValue {
-  user: AuthUser
-  token: string
+  user: AuthUser | null
+  token: string | null
   isAuthenticated: boolean
   onboardingComplete: boolean
-  onboardingData: OnboardingData
+  onboardingData: OnboardingData | null
   login: (token: string, user: AuthUser) => void
   logout: () => void
   completeOnboarding: (data: OnboardingData) => void
@@ -32,19 +34,8 @@ interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | null>(null)
 
-const TOKEN_KEY = 'pp_access_token'
-const USER_KEY  = 'pp_user'
 const ONBOARDING_KEY = 'pp_onboarding_complete'
 const ONBOARDING_DATA_KEY = 'pp_onboarding_data'
-
-// Default Demo User for instant demo access without auth barriers
-export const DEFAULT_DEMO_USER: AuthUser = {
-  user_id: '00000000-0000-0000-0000-000000000002',
-  name: 'Demo Pilot',
-  email: 'demo@preppilot.ai',
-  role: 'candidate',
-  created_at: new Date().toISOString(),
-}
 
 export const DEFAULT_ONBOARDING_DATA: OnboardingData = {
   targetRole: 'software-engineer',
@@ -53,27 +44,42 @@ export const DEFAULT_ONBOARDING_DATA: OnboardingData = {
   focusTopics: ['dsa', 'system-design', 'behavioral'],
 }
 
-const DEFAULT_DEMO_TOKEN = 'demo-jwt-token'
-
 /**
- * AuthProvider — provides default demo user so all features can be demonstrated smoothly.
+ * AuthProvider — wraps Clerk's auth hooks and maps Clerk user to internal AuthUser structure.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem(TOKEN_KEY)
-  })
-  const [user, setUser] = useState<AuthUser | null>(() => {
-    try {
-      const stored = localStorage.getItem(USER_KEY)
-      return stored ? JSON.parse(stored) : null
-    } catch {
-      return null
+  const { user: clerkUser, isLoaded: isUserLoaded } = useUser()
+  const { getToken, signOut, isLoaded: isAuthLoaded } = useAuth()
+  const [token, setToken] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchToken() {
+      if (isAuthLoaded) {
+        const t = await getToken()
+        setToken(t)
+      }
     }
-  })
+    fetchToken()
+  }, [isAuthLoaded, getToken])
+
+  const mappedUserId = useMemo(() => clerkUser?.id ? mapClerkIdToUUID(clerkUser.id) : null, [clerkUser?.id])
+
+  const user = useMemo<AuthUser | null>(() => {
+    if (!clerkUser || !mappedUserId) return null
+    return {
+      user_id: mappedUserId,
+      name: clerkUser.fullName || clerkUser.firstName || 'Candidate',
+      email: clerkUser.primaryEmailAddress?.emailAddress || '',
+      role: 'candidate',
+      created_at: clerkUser.createdAt ? new Date(clerkUser.createdAt).toISOString() : new Date().toISOString(),
+    }
+  }, [clerkUser, mappedUserId])
+
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(() => {
     const stored = localStorage.getItem(ONBOARDING_KEY)
     return stored === 'true'
   })
+  
   const [onboardingData, setOnboardingData] = useState<OnboardingData | null>(() => {
     try {
       const stored = localStorage.getItem(ONBOARDING_DATA_KEY)
@@ -83,34 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   })
 
-  // Set default auth interceptor token
-  useEffect(() => {
-    if (token) {
-      localStorage.setItem('access_token', token)
-    } else {
-      localStorage.removeItem('access_token')
-    }
-  }, [token])
-
-  const login = useCallback((newToken: string, newUser: AuthUser) => {
-    setToken(newToken)
-    setUser(newUser)
-    localStorage.setItem(TOKEN_KEY, newToken)
-    localStorage.setItem(USER_KEY, JSON.stringify(newUser))
-    localStorage.setItem('access_token', newToken)
+  // We don't use these manual login/logout anymore for auth state (Clerk owns it),
+  // but they are here to satisfy the interface if components still call them.
+  const login = useCallback((_newToken: string, _newUser: AuthUser) => {
+    console.warn("Manual login called. Clerk manages auth state now.")
   }, [])
 
   const logout = useCallback(() => {
-    setUser(null)
-    setToken(null)
-    setOnboardingComplete(false)
-    setOnboardingData(null)
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-    localStorage.removeItem(ONBOARDING_KEY)
-    localStorage.removeItem(ONBOARDING_DATA_KEY)
-    localStorage.removeItem('access_token')
-  }, [])
+    signOut()
+  }, [signOut])
 
   const completeOnboarding = useCallback((data: OnboardingData) => {
     setOnboardingComplete(true)
@@ -122,11 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        user: user as AuthUser, // Only used when authenticated
-        token: token as string,
-        isAuthenticated: !!token && !!user,
+        user,
+        token,
+        isAuthenticated: !!clerkUser,
         onboardingComplete,
-        onboardingData: onboardingData as OnboardingData, // Only used when onboarded
+        onboardingData,
         login,
         logout,
         completeOnboarding,

@@ -27,10 +27,11 @@ from app.schemas.dashboard import (
     StudyPlanOut,
     TopicProgressOut,
 )
+from app.dependencies.auth import verify_clerk_token
 
 router = APIRouter()
 
-DEFAULT_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
+
 
 
 def _build_recommended_focus(avg_score: float, question_frequency: int) -> str:
@@ -53,7 +54,8 @@ def _build_recommended_focus(avg_score: float, question_frequency: int) -> str:
 @router.get("/dashboard/summary", response_model=DashboardSummaryOut)
 def get_dashboard_summary(
     user_id: uuid.UUID, 
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    user=Depends(verify_clerk_token),
 ) -> DashboardSummaryOut:
     """
     Pod 3 core endpoint for PrepIQ dashboard.

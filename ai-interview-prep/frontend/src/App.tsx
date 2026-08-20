@@ -20,14 +20,26 @@ import History       from './pages/History'
 import PriorityPlan  from './pages/PriorityPlan'
 import SessionAnalysis from './pages/SessionAnalysis'
 
+import { SignedIn, SignedOut, RedirectToSignIn } from '@clerk/clerk-react'
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { onboardingComplete } = useAuth()
   const location = useLocation()
-  
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
-  }
-  return <>{children}</>
+
+  return (
+    <>
+      <SignedIn>
+        {!onboardingComplete && location.pathname !== '/onboarding' ? (
+          <Navigate to="/onboarding" replace />
+        ) : (
+          children
+        )}
+      </SignedIn>
+      <SignedOut>
+        <RedirectToSignIn />
+      </SignedOut>
+    </>
+  )
 }
 
 function AppRoutes() {
@@ -66,10 +78,10 @@ function AppRoutes() {
  */
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
         <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+      </AuthProvider>
+    </BrowserRouter>
   )
 }

@@ -71,7 +71,7 @@ export default function MockInterview() {
   const [timeLeft, setTimeLeft] = useState(MOCK_TIME_PER_Q)
 
   const autoAdvanceRef = useRef(false)  // prevent double-trigger
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id;
   const effectiveTopic = customTopic.trim() || topic
 
   // Per-question timer: reset when question changes

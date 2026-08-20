@@ -68,7 +68,7 @@ export default function Practice() {
   const [fetching, setFetching] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id
   const effectiveTopic = customTopic.trim() || topic
 
   const startSession = async () => {

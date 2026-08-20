@@ -16,9 +16,10 @@ from sqlalchemy import func
 from app.database import get_db
 from app.models.session import MockSession
 from app.models.answer import Answer as AnswerModel
-from app.models.score import Score as ScoreModel
 from app.models.question import Question as QuestionModel
+from app.models.score import Score as ScoreModel
 from app.schemas.sessions import SessionCreate, SessionOut, SessionResultOut, QuestionResultOut
+from app.dependencies.auth import verify_clerk_token
 
 router = APIRouter()
 
@@ -29,7 +30,11 @@ _DEFAULT_ROLE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 from app.models.role_topic import JobRole
 
 @router.post("", response_model=SessionOut, status_code=201)
-def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> SessionOut:
+def create_session(
+    payload: SessionCreate, 
+    db: DbSession = Depends(get_db),
+    user=Depends(verify_clerk_token)
+) -> SessionOut:
     """
     Creates and persists a new mock/practice session to the database.
     Returns the real session_id so the frontend can submit answers against it.
@@ -88,6 +93,7 @@ def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> S
 def list_sessions(
     user_id: uuid.UUID = Query(..., description="User UUID to list sessions for"),
     db: DbSession = Depends(get_db),
+    user=Depends(verify_clerk_token)
 ) -> List[SessionOut]:
     """
     Returns all sessions for a given user, sorted by start date descending.
@@ -135,6 +141,7 @@ def list_sessions(
 def get_session_results(
     session_id: uuid.UUID,
     db: DbSession = Depends(get_db),
+    user=Depends(verify_clerk_token)
 ) -> SessionResultOut:
     """
     Returns the full per-question analysis for a session.

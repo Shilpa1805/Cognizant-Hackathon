@@ -21,6 +21,13 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60 * 24  # 24 h
 
     # -----------------------------------------------------------------------
+    # Clerk Authentication
+    # -----------------------------------------------------------------------
+    CLERK_SECRET_KEY: str = ""
+    CLERK_JWKS_URL: str = "https://api.clerk.dev/v1/jwks"
+    CLERK_UUID_NAMESPACE: str = "a7f3c8d2-1e4b-4c8f-9a2d-5b6e7f8a9b0c"
+
+    # -----------------------------------------------------------------------
     # CORS
     # -----------------------------------------------------------------------
     CORS_ORIGINS: List[str] = ["http://localhost:5173", "http://localhost:3000"]
