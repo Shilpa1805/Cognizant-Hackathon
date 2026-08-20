@@ -26,14 +26,18 @@ router = APIRouter()
 _DEFAULT_ROLE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
+from app.models.role_topic import JobRole
+
 @router.post("", response_model=SessionOut, status_code=201)
 def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> SessionOut:
     """
     Creates and persists a new mock/practice session to the database.
     Returns the real session_id so the frontend can submit answers against it.
     """
-    # Resolve role_id — accept placeholder zeros gracefully
-    role_id = payload.role_id if payload.role_id != uuid.UUID("00000000-0000-0000-0000-000000000000") else _DEFAULT_ROLE_ID
+    # Resolve role_id safely to prevent SQLite foreign key constraint failures
+    valid_role = db.query(JobRole).filter(JobRole.role_id == payload.role_id).first()
+    # Fallback to seed ID 1 (SDE) if the provided role doesn't exist
+    role_id = payload.role_id if valid_role else uuid.UUID("00000000-0000-0000-0000-000000000001")
 
     session = MockSession(
         session_id=uuid.uuid4(),
