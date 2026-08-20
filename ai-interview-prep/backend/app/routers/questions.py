@@ -157,6 +157,8 @@ def get_questions(
     topic_filter = topic or "Python / Data Structures"
     difficulty_filter = difficulty or "Medium"
 
+    excluded = set(json.loads(excluded_ids) if excluded_ids else [])
+
     try:
         ai_questions = generate_questions_batch(
             role=role_filter,
@@ -177,12 +179,35 @@ def get_questions(
             for q in ai_questions
         ]
     except (GenerationError, Exception) as exc:
-        logger.error(
-            "Batch question generation failed (%s: %s). Returning empty list.",
+        logger.warning(
+            "Batch question generation failed (%s: %s). Falling back to ChromaDB.",
             type(exc).__name__, exc,
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=503,
-            detail="Question generation is temporarily unavailable. Please check your GEMINI_API_KEY and try again.",
-        )
+
+    # --- Attempt 2: ChromaDB bank fallback ---
+    bank = vector_store.get_random_questions(
+        role=role_filter,
+        topic=topic_filter,
+        difficulty=difficulty_filter,
+        count=count,
+        excluded_ids=excluded,
+    )
+    if bank:
+        return [
+            QuestionOut(
+                question_id=_to_uuid(bq.id),
+                topic_id=_DEFAULT_TOPIC_ID,
+                role_id=_DEFAULT_ROLE_ID,
+                question_text=bq.question_text,
+                reference_answer=bq.reference_answer,
+                difficulty=bq.difficulty.lower() if bq.difficulty else None,
+                source="chromadb",
+            )
+            for bq in bank
+        ]
+
+    raise HTTPException(
+        status_code=503,
+        detail="Question generation is temporarily unavailable. Please check your GEMINI_API_KEY and try again.",
+    )

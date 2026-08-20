@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DbSession
 
 from app.database import get_db
@@ -21,6 +22,7 @@ from app.models.answer import Answer as AnswerModel
 from app.models.score import Score as ScoreModel
 from app.models.session import MockSession
 from app.models.question import Question
+from app.models.user import User as UserModel
 
 router = APIRouter()
 
@@ -48,11 +50,17 @@ def submit_answer(
     # --- Persist Answer to DB (best-effort, non-blocking) ---
     effective_session_id = session_id or uuid.UUID("00000000-0000-0000-0000-000000000001")
     try:
-        from app.models.user import User as UserModel
+        from app.models.role_topic import JobRole, Topic as TopicModel
+
+        first_role = db.query(JobRole).first()
+        safe_role_id = first_role.role_id if first_role else uuid.UUID("00000000-0000-0000-0000-000000000001")
+        first_topic = db.query(TopicModel).first()
+        safe_topic_id = first_topic.topic_id if first_topic else uuid.UUID("00000000-0000-0000-0000-000000000001")
 
         # 1. Ensure user exists
         valid_user = db.query(UserModel).filter(UserModel.user_id == payload.user_id).first()
-        safe_user_id = payload.user_id if valid_user else uuid.UUID("00000000-0000-0000-0000-000000000002")
+        first_user = db.query(UserModel).first()
+        safe_user_id = payload.user_id if valid_user else (first_user.user_id if first_user else uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
         # 2. Ensure session exists
         session_exists = db.query(MockSession).filter(MockSession.session_id == effective_session_id).first()
@@ -60,7 +68,7 @@ def submit_answer(
             fallback_session = MockSession(
                 session_id=effective_session_id,
                 user_id=safe_user_id,
-                role_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                role_id=safe_role_id,
                 started_at=datetime.utcnow(),
                 status="active",
                 session_type="practice",
@@ -97,8 +105,8 @@ def submit_answer(
 
             new_q = Question(
                 question_id=payload.question_id,
-                role_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                topic_id=topic_row.topic_id,
+                role_id=safe_role_id,
+                topic_id=topic_row.topic_id if topic_row else safe_topic_id,
                 question_text=payload.question_text or "Dynamic Question",
                 reference_answer=payload.reference_answer or "Dynamic Answer",
                 difficulty=getattr(payload, "difficulty", "medium") or "medium",
@@ -138,13 +146,29 @@ def submit_answer(
         )
         db.add(score_row)
 
-        # Mark session as completed if this is last answer
+        # Only mark session completed when all expected questions have been answered
         session_row = db.query(MockSession).filter(
             MockSession.session_id == effective_session_id
         ).first()
         if session_row and session_row.status == "active":
-            session_row.ended_at = datetime.utcnow()
-            session_row.status = "completed"
+            # Count answers for this session
+            current_answer_count = db.query(func.count(AnswerModel.answer_id)).filter(
+                AnswerModel.session_id == effective_session_id
+            ).scalar() or 0
+
+            if payload.expected_question_count is not None and payload.expected_question_count > 0:
+                if current_answer_count >= payload.expected_question_count:
+                    session_row.ended_at = datetime.utcnow()
+                    session_row.status = "completed"
+            else:
+                import logging
+                logging.getLogger(__name__).warning(
+                    "submit_answer: expected_question_count was not provided for session %s. "
+                    "Cannot determine accurate completion boundary.",
+                    effective_session_id
+                )
+                session_row.ended_at = datetime.utcnow()
+                session_row.status = "completed"
 
         db.commit()
     except Exception as exc:

@@ -8,11 +8,7 @@ import Badge from '../components/Badge'
 import ProgressRing from '../components/ProgressRing'
 import styles from './Dashboard.module.css'
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
-
-interface TopicAvg {
+interface TopicAverage {
   topic_id: string
   topic_name: string
   avg_score: number
@@ -28,7 +24,7 @@ interface StudyPlanItem {
   question_frequency: number
 }
 
-interface SessionHistory {
+interface SessionHistoryItem {
   session_id: string
   started_at: string
   ended_at: string | null
@@ -37,9 +33,9 @@ interface SessionHistory {
 
 interface DashboardData {
   user_id: string
-  topic_average_scores: TopicAvg[]
+  topic_average_scores: TopicAverage[]
   study_plan: StudyPlanItem[]
-  session_history: SessionHistory[]
+  session_history: SessionHistoryItem[]
 }
 
 const TOPIC_COLORS = ['#A068FF', '#4ade80', '#60a5fa', '#fbbf24', '#f87171']
@@ -49,7 +45,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Use fallback user UUID if none is available in auth (should not happen if protected)
+  // Use fallback user UUID if none is available in auth
   const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
 
   useEffect(() => {
@@ -87,14 +83,27 @@ export default function Dashboard() {
     )
   }
 
-  const validSessions = data?.session_history?.filter(s => s.overall_session_score !== null) || []
-  const overallAvg = validSessions.length > 0
-    ? Math.round(validSessions.reduce((acc, s) => acc + (s.overall_session_score || 0), 0) / validSessions.length)
-    : 0
-  const totalAnswers = data?.topic_average_scores?.reduce((acc, t) => acc + (t.question_frequency || 0), 0) ?? 0
+  // Compute overall average and total answers:
+  // We weight each topic's avg_score by its question_frequency to reflect true overall accuracy.
+  // If no topic answers exist yet, we fall back to averaging overall_session_score from session_history.
+  const topicScores = data?.topic_average_scores ?? []
+  const totalAnswers = topicScores.reduce((acc, t) => acc + (t.question_frequency || 0), 0)
+  
+  let overallAvg = 0
+  if (totalAnswers > 0) {
+    const weightedSum = topicScores.reduce((acc, t) => acc + (t.avg_score * t.question_frequency), 0)
+    overallAvg = Math.round(weightedSum / totalAnswers)
+  } else if (data?.session_history && data.session_history.length > 0) {
+    const scoredSessions = data.session_history.filter(s => s.overall_session_score != null)
+    if (scoredSessions.length > 0) {
+      overallAvg = Math.round(
+        scoredSessions.reduce((acc, s) => acc + (s.overall_session_score ?? 0), 0) / scoredSessions.length
+      )
+    }
+  }
 
-  const topicProgress = data?.topic_average_scores ?? []
   const studyPlan = data?.study_plan ?? []
+  const sessionHistory = data?.session_history ?? []
 
   return (
     <div className={styles.container}>
@@ -135,7 +144,7 @@ export default function Dashboard() {
             <div className={styles.overviewText}>
               <h2 className={styles.overviewTitle}>Overall Preparedness</h2>
               <p className={styles.overviewDesc}>
-                You have completed {totalAnswers} topic answers.
+                You have completed {totalAnswers} question{totalAnswers !== 1 ? 's' : ''} across all sessions.
                 Your current weighted average score is {overallAvg}%. Keep practicing
                 your lowest-scoring modules to rank up your rating.
               </p>
@@ -150,39 +159,47 @@ export default function Dashboard() {
                 View detailed charts →
               </Link>
             </div>
-            <div className={styles.topicsGrid}>
-              {topicProgress.map((tp, idx) => {
-                const color = TOPIC_COLORS[idx % TOPIC_COLORS.length]
-                return (
-                  <Card key={tp.topic_id} className={styles.topicCard}>
-                    <div className={styles.topicInfo}>
-                      <div>
-                        <span className={styles.topicName}>{tp.topic_name}</span>
-                        <p className={styles.topicMeta}>
-                          {tp.question_frequency} attempt{tp.question_frequency !== 1 ? 's' : ''}
-                        </p>
+            {topicScores.length > 0 ? (
+              <div className={styles.topicsGrid}>
+                {topicScores.map((tp, idx) => {
+                  const color = TOPIC_COLORS[idx % TOPIC_COLORS.length]
+                  return (
+                    <Card key={tp.topic_id} className={styles.topicCard}>
+                      <div className={styles.topicInfo}>
+                        <div>
+                          <span className={styles.topicName}>{tp.topic_name}</span>
+                          <p className={styles.topicMeta}>
+                            {tp.question_frequency} question{tp.question_frequency !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        <Badge variant={tp.avg_score >= 75 ? 'easy' : tp.avg_score >= 55 ? 'medium' : 'hard'}>
+                          {tp.avg_score >= 75 ? 'Strong' : tp.avg_score >= 55 ? 'Medium' : 'Weak'}
+                        </Badge>
                       </div>
-                      <Badge variant={tp.avg_score >= 75 ? 'easy' : tp.avg_score >= 55 ? 'medium' : 'hard'}>
-                        {tp.avg_score >= 75 ? 'Strong' : tp.avg_score >= 55 ? 'Medium' : 'Weak'}
-                      </Badge>
-                    </div>
 
-                    <div className={styles.progressContainer}>
-                      <div className={styles.progressBarBg}>
-                        <div
-                          className={styles.progressBarFill}
-                          style={{
-                            width: `${tp.avg_score}%`,
-                            background: color,
-                          }}
-                        />
+                      <div className={styles.progressContainer}>
+                        <div className={styles.progressBarBg}>
+                          <div
+                            className={styles.progressBarFill}
+                            style={{
+                              width: `${Math.min(100, Math.max(0, tp.avg_score))}%`,
+                              background: color,
+                            }}
+                          />
+                        </div>
+                        <span className={styles.progressLabel}>{Math.round(tp.avg_score)}%</span>
                       </div>
-                      <span className={styles.progressLabel}>{Math.round(tp.avg_score)}%</span>
-                    </div>
-                  </Card>
-                )
-              })}
-            </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            ) : (
+              <Card variant="nohover" style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
+                  No topic scores recorded yet. Complete a practice or mock interview to see your competency breakdown!
+                </p>
+              </Card>
+            )}
           </div>
 
         </div>
@@ -205,7 +222,7 @@ export default function Dashboard() {
                   </div>
                 </div>
               ))}
-              {studyPlan.length > 0 && (
+              {studyPlan.length > 0 ? (
                 <Link
                   to="/study-plan"
                   className="toggleLink"
@@ -213,6 +230,10 @@ export default function Dashboard() {
                 >
                   View full resources & study plan →
                 </Link>
+              ) : (
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', textAlign: 'center' }}>
+                  Study plan generates automatically as you complete questions.
+                </p>
               )}
             </div>
           </div>
@@ -223,7 +244,37 @@ export default function Dashboard() {
               Recent Sessions
             </h2>
             <div className={styles.mockList}>
-              {(!data?.session_history || data.session_history.length === 0) ? (
+              {sessionHistory.length > 0 ? (
+                <>
+                  {sessionHistory.slice(0, 4).map((s) => (
+                    <div key={s.session_id} className={styles.mockItem}>
+                      <div>
+                        <span className={styles.mockTitle}>
+                          {new Date(s.started_at).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                        <p className={styles.mockDate}>
+                          {s.ended_at ? 'Completed' : 'Active / In Progress'}
+                        </p>
+                      </div>
+                      <Badge variant={s.overall_session_score != null && s.overall_session_score >= 70 ? 'easy' : s.overall_session_score != null ? 'medium' : 'hard'}>
+                        {s.overall_session_score != null ? `${Math.round(s.overall_session_score)}%` : 'In Progress'}
+                      </Badge>
+                    </div>
+                  ))}
+                  <Link
+                    to="/history"
+                    className="toggleLink"
+                    style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center' }}
+                  >
+                    View all sessions in History →
+                  </Link>
+                </>
+              ) : (
                 <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
                   <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
                     No sessions recorded yet.
@@ -233,35 +284,6 @@ export default function Dashboard() {
                     style={{ color: 'var(--accent)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}
                   >
                     Start your first mock interview →
-                  </Link>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {data.session_history.slice(0, 4).map(session => (
-                    <Card key={session.session_id} variant="nohover" style={{ padding: '12px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <div>
-                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 2px 0' }}>
-                            {formatDate(session.started_at)}
-                          </p>
-                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            {session.ended_at ? 'Completed' : 'In Progress'}
-                          </span>
-                        </div>
-                        {session.overall_session_score !== null && (
-                          <Badge variant={session.overall_session_score >= 70 ? 'easy' : session.overall_session_score >= 50 ? 'medium' : 'hard'}>
-                            {Math.round(session.overall_session_score)}%
-                          </Badge>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                  <Link
-                    to="/history"
-                    className="toggleLink"
-                    style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center', display: 'block', textAlign: 'center' }}
-                  >
-                    View all history →
                   </Link>
                 </div>
               )}

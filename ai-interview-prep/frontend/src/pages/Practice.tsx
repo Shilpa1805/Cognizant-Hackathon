@@ -70,6 +70,61 @@ export default function Practice() {
 
   const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
   const effectiveTopic = customTopic.trim() || topic
+  const ACTIVE_PRACTICE_KEY = 'prepiq_active_practice_session'
+
+  // Restore active practice session on mount if one was saved and is still active in DB
+  useEffect(() => {
+    const restoreSession = async () => {
+      const saved = localStorage.getItem(ACTIVE_PRACTICE_KEY)
+      if (!saved) return
+      try {
+        const parsed = JSON.parse(saved)
+        if (!parsed.sessionId || !parsed.questions || parsed.questions.length === 0) return
+
+        // Verify session status with backend
+        try {
+          const { data: sessionInfo } = await api.get(`/sessions/${parsed.sessionId}/results`)
+          if (sessionInfo && sessionInfo.status === 'completed') {
+            localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+            return
+          }
+        } catch {
+          localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+          return
+        }
+
+        // Note: Per requirements, per-question timer is restarted fresh on restore for simplicity
+        setSessionId(parsed.sessionId)
+        setQuestions(parsed.questions)
+        setCurrentIdx(parsed.currentIdx ?? 0)
+        setAnswers(parsed.answers ?? {})
+        if (parsed.role) setRole(parsed.role)
+        if (parsed.topic) setTopic(parsed.topic)
+        if (parsed.difficulty) setDifficulty(parsed.difficulty)
+        setPhase('active')
+      } catch (err) {
+        console.warn('Failed to restore active practice session', err)
+        localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+      }
+    }
+    restoreSession()
+  }, [])
+
+  // Persist minimal active session state to localStorage as user progresses
+  useEffect(() => {
+    if (phase === 'active' && sessionId && questions.length > 0) {
+      const payload = {
+        sessionId,
+        questions,
+        currentIdx,
+        answers,
+        role,
+        topic: effectiveTopic,
+        difficulty,
+      }
+      localStorage.setItem(ACTIVE_PRACTICE_KEY, JSON.stringify(payload))
+    }
+  }, [phase, sessionId, questions, currentIdx, answers, role, effectiveTopic, difficulty])
 
   const startSession = async () => {
     setFetching(true)
@@ -131,12 +186,14 @@ export default function Practice() {
             reference_answer: q.reference_answer || '',
             topic_text: effectiveTopic,
             difficulty: difficulty,
+            expected_question_count: questions.length,
           })
           scores.push({ score: scoreData, question: q, answerText })
         } catch {
           scores.push({ score: null, question: q, answerText })
         }
       }
+      localStorage.removeItem(ACTIVE_PRACTICE_KEY)
       navigate('/practice/analysis', {
         state: { sessionId, scores, sessionType: 'practice' },
       })
@@ -144,6 +201,15 @@ export default function Practice() {
       console.error('Submission failed', err)
       setPhase('active')
     }
+  }
+
+  const handleAbandon = () => {
+    localStorage.removeItem(ACTIVE_PRACTICE_KEY)
+    setPhase('config')
+    setSessionId(null)
+    setQuestions([])
+    setAnswers({})
+    setCurrentIdx(0)
   }
 
   const question = questions[currentIdx]

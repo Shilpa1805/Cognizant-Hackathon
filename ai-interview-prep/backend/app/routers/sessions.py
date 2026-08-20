@@ -38,12 +38,13 @@ def create_session(payload: SessionCreate, db: DbSession = Depends(get_db)) -> S
 
     # Resolve user_id safely to prevent SQLite foreign key constraint failures
     valid_user = db.query(UserModel).filter(UserModel.user_id == payload.user_id).first()
-    safe_user_id = payload.user_id if valid_user else uuid.UUID("00000000-0000-0000-0000-000000000002")
+    first_user = db.query(UserModel).first()
+    safe_user_id = payload.user_id if valid_user else (first_user.user_id if first_user else uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
     # Resolve role_id safely to prevent SQLite foreign key constraint failures
     valid_role = db.query(JobRole).filter(JobRole.role_id == payload.role_id).first()
-    # Fallback to seed ID 1 (SDE) if the provided role doesn't exist
-    role_id = payload.role_id if valid_role else uuid.UUID("00000000-0000-0000-0000-000000000001")
+    first_role = db.query(JobRole).first()
+    role_id = payload.role_id if valid_role else (first_role.role_id if first_role else uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
     session = MockSession(
         session_id=uuid.uuid4(),

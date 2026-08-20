@@ -176,19 +176,7 @@ def get_dashboard(user_id: uuid.UUID, db: Session = Depends(get_db)) -> List[Top
     records = db.query(TopicProgressModel).filter(TopicProgressModel.user_id == user_id).all()
     if records:
         return records
-
-    topics = db.query(TopicModel).all()
-    return [
-        TopicProgressOut(
-            id=uuid.uuid4(),
-            user_id=user_id,
-            topic_id=t.topic_id,
-            avg_score=65.0,
-            attempts_count=2,
-            last_updated=datetime.utcnow() - timedelta(days=idx),
-        )
-        for idx, t in enumerate(topics[:5])
-    ]
+    return []
 
 
 @router.get("/study-plan/{user_id}", response_model=List[StudyPlanOut])
