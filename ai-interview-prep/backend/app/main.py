@@ -1,11 +1,16 @@
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import select
 
 from app.config import settings
 from app.database import engine, Base, SessionLocal
+from app.models.user import User
 from app.routers import auth, questions, sessions, answers, scores, dashboard
 from app.seed import seed_database
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -14,9 +19,19 @@ async def lifespan(app: FastAPI):
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
+        # Lightweight startup sanity check against a core table
+        db.execute(select(User).limit(1))
+    except Exception as exc:
+        logger.error(
+            "Database sanity check failed: unable to query 'users' table (%s). "
+            "Ensure migrations have been run with 'alembic upgrade head'.",
+            exc,
+        )
+
+    try:
         seed_database(db)
     except Exception as e:
-        print(f"Auto-seed notification: {e}")
+        logger.warning(f"Auto-seed notification: {e}")
     finally:
         db.close()
     yield

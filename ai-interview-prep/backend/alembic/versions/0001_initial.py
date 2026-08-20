@@ -174,7 +174,7 @@ def upgrade() -> None:
         sa.Column("fused_score", sa.Float, nullable=True),
         sa.Column("human_calibrated_score", sa.Float, nullable=True),
         sa.Column("feedback_text", sa.Text, nullable=True),
-        sa.Column("missing_keywords", postgresql.JSONB, nullable=True),
+        sa.Column("missing_keywords", sa.JSON().with_variant(postgresql.JSONB, "postgresql"), nullable=True),
     )
     op.create_index("ix_scores_answer_id", "scores", ["answer_id"])
 
@@ -217,7 +217,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("priority_rank", sa.Integer, nullable=False),
-        sa.Column("recommended_resources", postgresql.JSONB, nullable=True),
+        sa.Column("recommended_resources", sa.JSON().with_variant(postgresql.JSONB, "postgresql"), nullable=True),
         sa.Column("generated_at", sa.DateTime, nullable=False, server_default=sa.func.now()),
     )
     op.create_index("ix_study_plan_user_id", "study_plan", ["user_id"])

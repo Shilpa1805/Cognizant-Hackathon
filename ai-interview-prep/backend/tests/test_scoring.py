@@ -21,8 +21,9 @@ def test_compute_similarity_offline():
 def test_concept_match_missing_keywords():
     ref = "SQL databases support ACID transactions and vertical scaling."
     ans = "SQL is structured and relational."
-    score, missing = concept_match(ans, ref)
+    score, matched, missing = concept_match(ans, ref)
     assert 0.0 <= score <= 1.0
+    assert isinstance(matched, list)
     assert isinstance(missing, list)
 
 

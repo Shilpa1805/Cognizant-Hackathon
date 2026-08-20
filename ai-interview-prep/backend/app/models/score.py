@@ -27,4 +27,10 @@ class Score(Base):
     feedback_text: str = Column(Text, nullable=True)
     # stored as JSON array of strings, e.g. ["CAP theorem", "consistency models"]
     missing_keywords = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    answer_explanation: str = Column(Text, nullable=True)
+    # stored as JSON array of strings
+    connecting_keywords = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+    # stored as JSON array of strings
+    tips_and_tricks = Column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
+
 

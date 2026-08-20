@@ -9,6 +9,7 @@ Scoring Service — 3-Signal Hybrid Scoring Engine
 
 import os
 import re
+import json
 from typing import List, Tuple, Dict, Any, Optional
 
 # Signal 1: Sentence Transformers & Scikit-Learn
@@ -86,14 +87,14 @@ def compute_similarity(text_a: str, text_b: str) -> float:
     return float(len(intersection) / len(union))
 
 
-def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[str]]:
+def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[str], List[str]]:
     """
     Concept-overlap signal — extracts key concepts/noun phrases from reference answer
     (via spaCy or regex heuristic) and checks presence in student answer.
-    Returns (concept_match_score, missing_keywords).
+    Returns (concept_match_score, matched_keywords, missing_keywords).
     """
     if not reference_answer:
-        return (1.0, [])
+        return (1.0, [], [])
 
     concepts = []
     if HAS_SPACY and _nlp:
@@ -113,9 +114,8 @@ def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[
         stopwords = {"with", "from", "that", "this", "have", "which", "their", "there", "were", "what", "when", "where", "also", "using"}
         concepts = list(set([w.lower() for w in words if w.lower() not in stopwords]))[:10]
 
-
     if not concepts:
-        return (1.0, [])
+        return (1.0, [], [])
 
     ans_lower = answer_text.lower()
     matched = []
@@ -129,13 +129,14 @@ def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[
             missing.append(c)
 
     score = float(len(matched) / len(concepts)) if concepts else 1.0
-    return (round(score, 3), missing)
+    return (round(score, 3), matched, missing)
 
 
-def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tuple[float, str]:
+def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tuple[float, str, str, List[str]]:
     """
     LLM-judge signal — prompts Gemini LLM to rate correctness, clarity, and structure (0.0-1.0)
-    and return constructive feedback text.
+    and return constructive feedback, answer explanation, and tips/tricks.
+    Returns (score, feedback, answer_explanation, tips_and_tricks).
     """
     api_key = os.environ.get("GEMINI_API_KEY")
     if HAS_GENAI and api_key:
@@ -148,7 +149,9 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                 f"Evaluate the candidate's answer for technical accuracy, completeness, and clarity.\n"
                 f"Respond ONLY with a JSON object containing:\n"
                 f"- 'score': float between 0.0 and 1.0\n"
-                f"- 'feedback': 2-3 sentences of constructive feedback."
+                f"- 'feedback': 2-3 sentences of constructive feedback.\n"
+                f"- 'answer_explanation': a 2-4 sentence plain-English breakdown of why the reference answer is correct/what it covers\n"
+                f"- 'tips_and_tricks': JSON array of 1-3 short actionable tips for answering this type of question well"
             )
 
             response = client.models.generate_content(
@@ -162,23 +165,32 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                     cleaned = cleaned.split("```json")[1].split("```")[0].strip()
                 elif cleaned.startswith("```"):
                     cleaned = cleaned.split("```")[1].split("```")[0].strip()
-                
-                import json
+
                 data = json.loads(cleaned)
                 score = float(data.get("score", 0.70))
                 feedback = str(data.get("feedback", "Good effort! Your response addresses the question."))
-                return (max(0.0, min(1.0, score)), feedback)
+                answer_explanation = str(data.get("answer_explanation", ""))
+                tips_raw = data.get("tips_and_tricks", [])
+                tips_and_tricks = [str(t) for t in tips_raw] if isinstance(tips_raw, list) else []
+                return (max(0.0, min(1.0, score)), feedback, answer_explanation, tips_and_tricks)
         except Exception as exc:
             print(f"LLM Judge error: {exc}. Using heuristic rating.")
 
     # Fallback heuristic judge when LLM is unavailable
     words_count = len(answer_text.split())
     if words_count < 5:
-        return (0.30, "Your answer is very brief. Provide more explanation and technical detail.")
+        score = 0.30
+        feedback = "Your answer is very brief. Provide more explanation and technical detail."
     elif words_count < 15:
-        return (0.60, "Solid basic answer. Consider expanding on trade-offs and specific examples.")
+        score = 0.60
+        feedback = "Solid basic answer. Consider expanding on trade-offs and specific examples."
     else:
-        return (0.80, "Good, detailed response covering key points.")
+        score = 0.80
+        feedback = "Good, detailed response covering key points."
+
+    answer_explanation = ""
+    tips_and_tricks = []
+    return (score, feedback, answer_explanation, tips_and_tricks)
 
 
 def score_answer(
@@ -195,10 +207,10 @@ def score_answer(
     sim_score = compute_similarity(answer_text, reference_answer or question_text)
 
     # 2. Concept Match Score & missing_keywords
-    concept_score, missing = concept_match(answer_text, reference_answer or question_text)
+    concept_score, matched, missing = concept_match(answer_text, reference_answer or question_text)
 
     # 3. LLM Judge Score & feedback_text
-    judge_score, feedback = llm_judge(answer_text, reference_answer or "", question_text or "")
+    judge_score, feedback, explanation, tips = llm_judge(answer_text, reference_answer or "", question_text or "")
 
     # 4. Signal Fusion Step
     # Weights: 0.35 similarity + 0.35 concept match + 0.30 LLM judge
@@ -215,5 +227,7 @@ def score_answer(
         "human_calibrated_score": None,
         "feedback_text": feedback,
         "missing_keywords": missing,
+        "matched_keywords": matched,
+        "answer_explanation": explanation,
+        "tips_and_tricks": tips,
     }
-

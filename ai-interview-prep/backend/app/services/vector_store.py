@@ -2,7 +2,11 @@ import random
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-import chromadb
+try:
+    import chromadb
+except ImportError:
+    chromadb = None
+
 
 from app.schemas import Question
 
@@ -80,11 +84,15 @@ DIFFICULTY_FALLBACK: dict[str, list[str]] = {
 
 class VectorStoreService:
     def __init__(self, db_path: Path = CHROMA_DB_PATH):
-        self.client = chromadb.PersistentClient(path=str(db_path))
-        self.collection = self.client.get_or_create_collection(
-            name="question_bank",
-            metadata={"hnsw:space": "cosine"}
-        )
+        if chromadb is not None:
+            self.client = chromadb.PersistentClient(path=str(db_path))
+            self.collection = self.client.get_or_create_collection(
+                name="question_bank",
+                metadata={"hnsw:space": "cosine"}
+            )
+        else:
+            self.client = None
+            self.collection = None
 
     # ── Internal fetch helper ────────────────────────────────────────────────
     def _fetch(
@@ -98,6 +106,9 @@ class VectorStoreService:
         Builds a ChromaDB where-filter from any combination of fields and
         returns up to n Question objects. Returns [] on no match or error.
         """
+        if self.collection is None:
+            return []
+
         conditions = []
         if role:
             conditions.append({"role": role})
@@ -258,3 +269,8 @@ vector_store = VectorStoreService()
 def get_question(role: str, topic: Optional[str] = None) -> Question:
     """Standard Pod 1 function interface."""
     return vector_store.get_question(role, topic)
+
+
+def ingest_questions(questions: list) -> None:
+    """Ingest seed questions into vector store (stub)."""
+    pass
