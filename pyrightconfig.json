@@ -1,0 +1,11 @@
+{
+  "include": [
+    "dashboard_backend",
+    "dashboard_ui"
+  ],
+  "extraPaths": [
+    "C:\\Users\\John Paul\\AppData\\Local\\Python\\pythoncore-3.14-64\\Lib\\site-packages",
+    "dashboard_ui",
+    "dashboard_backend"
+  ]
+}
