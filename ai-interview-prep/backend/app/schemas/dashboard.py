@@ -36,6 +36,11 @@ class DashboardTopicAverageOut(BaseModel):
     topic_name: str
     avg_score: float
     question_frequency: int
+    last_attempted: Optional[datetime] = None
+    recent_missed_concepts: List[str] = []
+    recent_topic_scores: List[float] = []
+    recent_session_id: Optional[UUID] = None
+    recent_answer_id: Optional[UUID] = None
 
 
 class DashboardStudyPlanItemOut(BaseModel):
@@ -45,6 +50,11 @@ class DashboardStudyPlanItemOut(BaseModel):
     recommended_focus: str
     avg_score: float
     question_frequency: int
+    last_attempted: Optional[datetime] = None
+    recent_missed_concepts: List[str] = []
+    recent_topic_scores: List[float] = []
+    recent_session_id: Optional[UUID] = None
+    recent_answer_id: Optional[UUID] = None
 
 
 class DashboardSessionHistoryOut(BaseModel):

@@ -98,30 +98,63 @@ def get_dashboard_summary(
         key=lambda row: (float(row.avg_score), -int(row.question_frequency), row.topic_name),
     )
 
-    topic_average_scores = [
-        DashboardTopicAverageOut(
-            topic_id=row.topic_id,
-            topic_name=row.topic_name,
-            avg_score=round(float(row.avg_score), 2),
-            question_frequency=int(row.question_frequency),
-        )
-        for row in ordered_topics
-    ]
+    topic_average_scores = []
+    study_plan = []
 
-    study_plan = [
-        DashboardStudyPlanItemOut(
-            topic_id=row.topic_id,
-            topic_name=row.topic_name,
-            priority_rank=rank,
-            recommended_focus=_build_recommended_focus(
+    for rank, row in enumerate(ordered_topics, start=1):
+        # Fetch up to 5 most recent scored answers for this topic
+        recent = (
+            db.query(ScoreModel.fused_score, AnswerModel.submitted_at, ScoreModel.missing_keywords, AnswerModel.session_id, AnswerModel.answer_id)
+            .join(AnswerModel, ScoreModel.answer_id == AnswerModel.answer_id)
+            .join(QuestionModel, AnswerModel.question_id == QuestionModel.question_id)
+            .filter(
+                QuestionModel.topic_id == row.topic_id,
+                AnswerModel.user_id == user_id,
+                ScoreModel.fused_score.isnot(None),
+            )
+            .order_by(AnswerModel.submitted_at.desc())
+            .limit(5)
+            .all()
+        )
+
+        recent_topic_scores = [round(float(s[0]), 2) for s in reversed(recent)] if recent else []
+        last_attempted = recent[0][1] if recent else None
+        recent_missed_concepts = recent[0][2] if recent and recent[0][2] else []
+        recent_session_id = recent[0][3] if recent else None
+        recent_answer_id = recent[0][4] if recent else None
+
+        topic_average_scores.append(
+            DashboardTopicAverageOut(
+                topic_id=row.topic_id,
+                topic_name=row.topic_name,
                 avg_score=round(float(row.avg_score), 2),
                 question_frequency=int(row.question_frequency),
-            ),
-            avg_score=round(float(row.avg_score), 2),
-            question_frequency=int(row.question_frequency),
+                last_attempted=last_attempted,
+                recent_missed_concepts=recent_missed_concepts,
+                recent_topic_scores=recent_topic_scores,
+                recent_session_id=recent_session_id,
+                recent_answer_id=recent_answer_id,
+            )
         )
-        for rank, row in enumerate(ordered_topics, start=1)
-    ]
+
+        study_plan.append(
+            DashboardStudyPlanItemOut(
+                topic_id=row.topic_id,
+                topic_name=row.topic_name,
+                priority_rank=rank,
+                recommended_focus=_build_recommended_focus(
+                    avg_score=round(float(row.avg_score), 2),
+                    question_frequency=int(row.question_frequency),
+                ),
+                avg_score=round(float(row.avg_score), 2),
+                question_frequency=int(row.question_frequency),
+                last_attempted=last_attempted,
+                recent_missed_concepts=recent_missed_concepts,
+                recent_topic_scores=recent_topic_scores,
+                recent_session_id=recent_session_id,
+                recent_answer_id=recent_answer_id,
+            )
+        )
 
     session_rows = (
         db.query(

@@ -1,0 +1,272 @@
+.container {
+  padding: var(--space-6);
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header {
+  margin-bottom: var(--space-6);
+}
+
+.header h1 {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--color-foreground);
+  margin-bottom: var(--space-2);
+}
+
+.header p {
+  color: var(--color-muted);
+  font-size: var(--text-lg);
+}
+
+.suggestCard {
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  margin-bottom: var(--space-8);
+}
+
+.suggestCard h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin-bottom: var(--space-3);
+  color: var(--color-foreground);
+}
+
+.suggestCard p {
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin-bottom: var(--space-4);
+}
+
+.suggestActions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-5);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  transition: transform 0.2s;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-border-hover);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cardTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--color-foreground);
+}
+
+.badgeMastered {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.badgeSolid {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.badgeBuilding {
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.badgeStruggling {
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cardBody {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+}
+
+.metricLabel {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  color: var(--color-muted);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.metricValue {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-foreground);
+}
+
+.sparkline {
+  flex: 1;
+  height: 40px;
+}
+
+.noData {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.cardFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
+  margin-top: auto;
+}
+
+.lastAttempt {
+  font-size: var(--text-sm);
+  color: var(--color-muted);
+}
+
+.quickFix {
+  background: var(--color-surface-hover);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.quickFixLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-foreground);
+  margin-bottom: var(--space-2);
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pill {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--color-foreground);
+}
+
+/* Gap Drill Modal */
+.drillOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drillModal {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 600px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.drillModal h2 {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin-bottom: var(--space-5);
+}
+
+.drillQuestionArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.qText {
+  font-size: var(--text-lg);
+  line-height: 1.6;
+  color: var(--color-foreground);
+}
+
+.textarea {
+  width: 100%;
+  background: var(--color-surface-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  color: var(--color-foreground);
+  font-family: inherit;
+  font-size: var(--text-base);
+  resize: vertical;
+}
+
+.textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.drillResultArea {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.drillResultArea h3 {
+  font-size: var(--text-xl);
+  color: var(--color-primary);
+}
+
+.drillResultArea p {
+  line-height: 1.6;
+  color: var(--color-muted);
+}
