@@ -5,6 +5,7 @@ import NavHeader from '../components/NavHeader'
 import Footer from '../components/Footer'
 import Button from '../components/Button'
 import OrbitVisual from '../components/OrbitVisual'
+import api from '../lib/api'
 import styles from './AuthPage.module.css'
 
 const ROLES = [
