@@ -19,6 +19,7 @@ import Analytics     from './pages/Analytics'
 import Profile       from './pages/Profile'
 import History       from './pages/History'
 import StudyPlan     from './pages/StudyPlan'
+import SessionAnalysis from './pages/SessionAnalysis'
 
 function AppRoutes() {
   return (
@@ -34,7 +35,9 @@ function AppRoutes() {
       <Route element={<Layout />}>
         <Route path="/dashboard"           element={<Dashboard />} />
         <Route path="/practice"            element={<Practice />} />
+        <Route path="/practice/analysis"   element={<SessionAnalysis />} />
         <Route path="/mock-interview/:id"  element={<MockInterview />} />
+        <Route path="/mock/analysis"       element={<SessionAnalysis />} />
         <Route path="/feedback/:sessionId" element={<Feedback />} />
         <Route path="/analytics"           element={<Analytics />} />
         <Route path="/resources"           element={<Resources />} />

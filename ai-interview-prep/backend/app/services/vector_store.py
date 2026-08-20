@@ -232,11 +232,13 @@ class VectorStoreService:
         return examples
 
     def get_random_questions(
-        self, role: str, topic: Optional[str] = None, count: int = 1
+        self, role: str, topic: Optional[str] = None, count: int = 1,
+        excluded_ids: Optional[set] = None,
     ) -> List[Question]:
         """
         Retrieves random questions from ChromaDB filtered by role and topic.
         Respects ROLE_MAP so any job title works.
+        Filters out any question IDs in excluded_ids to prevent repeats.
         """
         mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
         results_pool = self._fetch(role=mapped_role, topic=topic, n=50)
@@ -244,6 +246,10 @@ class VectorStoreService:
             results_pool = self._fetch(role=mapped_role, n=50)
         if not results_pool:
             return []
+
+        # Filter excluded IDs
+        if excluded_ids:
+            results_pool = [q for q in results_pool if str(q.id) not in excluded_ids]
 
         random.shuffle(results_pool)
         return results_pool[:count]

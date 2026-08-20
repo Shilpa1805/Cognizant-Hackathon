@@ -27,6 +27,7 @@ class MockSession(Base):
     started_at: datetime = Column(DateTime, nullable=False, default=datetime.utcnow)
     ended_at: datetime = Column(DateTime, nullable=True)
     status: str = Column(String(50), nullable=False, default="active")  # active | completed
+    session_type: str = Column(String(20), nullable=False, default="practice")  # practice | mock
 
     session_questions = relationship("SessionQuestion", back_populates="session")
 

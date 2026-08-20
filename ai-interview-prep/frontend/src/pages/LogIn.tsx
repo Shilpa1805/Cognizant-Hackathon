@@ -1,43 +1,66 @@
 import { useState, FormEvent } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import api from '../lib/api'
 import NavHeader from '../components/NavHeader'
 import Footer from '../components/Footer'
 import Button from '../components/Button'
 import OrbitVisual from '../components/OrbitVisual'
 import styles from './AuthPage.module.css'
 
+const ROLES = [
+  { id: 'Backend Engineer',   label: 'Backend Engineer',   icon: '⚙️', desc: 'APIs, DBs, System Design' },
+  { id: 'Frontend Engineer',  label: 'Frontend Engineer',  icon: '🎨', desc: 'React, UI, UX, Styling' },
+  { id: 'Software Engineer',  label: 'Software Engineer',  icon: '💻', desc: 'Full Stack, Generalist' },
+  { id: 'ML Engineer',        label: 'ML Engineer',        icon: '🤖', desc: 'AI, Models, Pipelines' },
+]
+
 export default function LogIn() {
   const navigate = useNavigate()
-  const { login } = useAuth()
-  const [searchParams] = useSearchParams()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const { login, completeOnboarding } = useAuth()
+
+  // Step 1: enter name | Step 2: pick role
+  const [step, setStep] = useState<1 | 2>(1)
+  const [name, setName] = useState('')
+  const [selectedRole, setSelectedRole] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const nextPath = searchParams.get('next') ?? '/dashboard'
-
-  const handleSubmit = async (e: FormEvent) => {
+  const handleNameSubmit = (e: FormEvent) => {
     e.preventDefault()
+    if (!name.trim()) { setError('Please enter your name.'); return }
     setError(null)
+    setStep(2)
+  }
+
+  const handleRoleSelect = (roleId: string) => {
+    setSelectedRole(roleId)
+  }
+
+  const handleFinish = () => {
+    if (!selectedRole) { setError('Please select a role to continue.'); return }
     setLoading(true)
-    try {
-      const { data } = await api.post('/auth/login', { email, password })
-      login(data.access_token, data.user)
-      
-      const onboardingDone = localStorage.getItem('pp_onboarding_complete') === 'true'
-      if (!onboardingDone) {
-        navigate('/onboarding')
-      } else {
-        navigate(nextPath)
-      }
-    } catch (err: any) {
-      setError(err.response?.data?.detail ?? 'Invalid email or password.')
-    } finally {
-      setLoading(false)
+
+    // Build a demo user with the chosen name and role
+    const demoUser = {
+      user_id: '00000000-0000-0000-0000-000000000002',
+      name: name.trim(),
+      email: `${name.trim().toLowerCase().replace(/\s+/g, '.')}@demo.prepiq.ai`,
+      role: 'candidate',
+      created_at: new Date().toISOString(),
     }
+
+    login('demo-jwt-token', demoUser)
+
+    // Save onboarding data with selected role so Practice/Mock can pre-fill it
+    completeOnboarding({
+      targetRole: selectedRole,
+      targetCompanies: [],
+      experienceLevel: 'mid',
+      focusTopics: [],
+    })
+
+    navigate('/dashboard')
+    setLoading(false)
   }
 
   return (
@@ -45,56 +68,100 @@ export default function LogIn() {
       <NavHeader />
       <main className={styles.main}>
         <div className={styles.card}>
-          <h1 className={styles.title}>Welcome back</h1>
-          <p className={styles.subtitle}>Sign in to continue your preparation.</p>
 
-          <form onSubmit={handleSubmit} className={styles.form}>
-            <div className={styles.field}>
-              <label htmlFor="login-email" className={styles.label}>Email</label>
-              <input
-                id="login-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className={styles.input}
-                placeholder="you@example.com"
-              />
-            </div>
+          {step === 1 && (
+            <>
+              <h1 className={styles.title}>Welcome to PrepIQ 👋</h1>
+              <p className={styles.subtitle}>Enter your name to get started — no account needed.</p>
 
-            <div className={styles.field}>
-              <label htmlFor="login-password" className={styles.label}>Password</label>
-              <input
-                id="login-password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className={styles.input}
-                placeholder="••••••••"
-              />
-            </div>
+              <form onSubmit={handleNameSubmit} className={styles.form}>
+                <div className={styles.field}>
+                  <label htmlFor="login-name" className={styles.label}>Your Name</label>
+                  <input
+                    id="login-name"
+                    type="text"
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className={styles.input}
+                    placeholder="e.g. Priya Sharma"
+                    autoFocus
+                  />
+                </div>
 
-            {error && <div className={styles.error}>{error}</div>}
+                {error && <div className={styles.error}>{error}</div>}
 
-            <Button
-              id="login-submit"
-              type="submit"
-              variant="primary"
-              disabled={loading}
-              className={styles.submitBtn}
-              withBorder
-            >
-              {loading ? 'Signing in...' : 'Sign In'}
-            </Button>
-          </form>
+                <Button
+                  id="login-continue"
+                  type="submit"
+                  variant="primary"
+                  className={styles.submitBtn}
+                  withBorder
+                >
+                  Continue →
+                </Button>
+              </form>
 
-          <p className={styles.toggle}>
-            Don't have an account?{' '}
-            <Link to="/signup" className={styles.toggleLink}>
-              Sign up
-            </Link>
-          </p>
+              <p className={styles.toggle}>
+                Want the full experience?{' '}
+                <Link to="/signup" className={styles.toggleLink}>
+                  Sign up
+                </Link>
+              </p>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
+              <h1 className={styles.title}>Pick your target role</h1>
+              <p className={styles.subtitle}>
+                Hi {name}! Choose the role you're interviewing for. This pre-fills your practice sessions.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', margin: '20px 0' }}>
+                {ROLES.map(r => (
+                  <div
+                    key={r.id}
+                    id={`role-${r.id.toLowerCase().replace(/\s+/g, '-')}`}
+                    onClick={() => handleRoleSelect(r.id)}
+                    style={{
+                      padding: '14px 16px',
+                      border: `2px solid ${selectedRole === r.id ? 'var(--accent)' : 'var(--border)'}`,
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      background: selectedRole === r.id ? 'rgba(160,104,255,0.1)' : 'var(--surface)',
+                      transition: 'all 0.2s',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                    }}
+                  >
+                    <span style={{ fontSize: '22px' }}>{r.icon}</span>
+                    <span style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)' }}>{r.label}</span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.desc}</span>
+                  </div>
+                ))}
+              </div>
+
+              {error && <div className={styles.error}>{error}</div>}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <Button variant="secondary" onClick={() => setStep(1)} size="sm">
+                  ← Back
+                </Button>
+                <Button
+                  id="login-submit"
+                  variant="primary"
+                  onClick={handleFinish}
+                  disabled={loading || !selectedRole}
+                  className={styles.submitBtn}
+                  withBorder
+                >
+                  {loading ? 'Setting up...' : 'Start Preparing 🚀'}
+                </Button>
+              </div>
+            </>
+          )}
         </div>
 
         <div className={styles.deco} aria-hidden="true">

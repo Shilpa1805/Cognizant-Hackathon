@@ -7,6 +7,7 @@ GET /questions       — returns a list of questions (bulk endpoint).
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
+import json
 
 from app.schemas.questions import QuestionOut
 from app.services.vector_store import vector_store
@@ -33,6 +34,7 @@ def next_question(
     role: Optional[str] = Query(None, description="Filter by role, e.g. 'Backend Engineer'"),
     topic: Optional[str] = Query(None, description="Filter by topic, e.g. 'Python / Data Structures'"),
     difficulty: Optional[str] = Query(None, description="Preferred difficulty: Easy, Medium, Hard"),
+    excluded_ids: Optional[str] = Query(None, description="JSON array of question IDs to exclude (already seen)"),
 ) -> QuestionOut:
     """
     Returns ONE freshly generated interview question for the given role, topic, and difficulty.
@@ -66,6 +68,7 @@ def next_question(
     role_filter = role or "Backend Engineer"
     topic_filter = topic or "Python / Data Structures"
     difficulty_filter = difficulty or "Medium"
+    excluded = set(json.loads(excluded_ids) if excluded_ids else [])
 
     # --- Attempt 1: Gemini generation (Person 2) ---
     try:
@@ -92,7 +95,8 @@ def next_question(
     bank = vector_store.get_random_questions(
         role=role_filter,
         topic=topic_filter,
-        count=1,
+        count=5,  # fetch more to allow filtering excluded
+        excluded_ids=excluded,
     )
     if bank:
         bq = bank[0]
@@ -116,7 +120,9 @@ def next_question(
 def get_questions(
     role: Optional[str] = Query(None, description="Filter by role name, e.g. 'Backend Engineer'"),
     topic: Optional[str] = Query(None, description="Filter by topic name, e.g. 'Python / Data Structures'"),
-    count: int = Query(3, ge=1, le=10, description="Number of questions to retrieve (3-5 typical)"),
+    difficulty: Optional[str] = Query(None, description="Preferred difficulty: Easy, Medium, Hard"),
+    count: int = Query(5, ge=1, le=10, description="Number of questions to retrieve (5-10)"),
+    excluded_ids: Optional[str] = Query(None, description="JSON array of question IDs to exclude"),
 ) -> List[QuestionOut]:
     """
     Returns a batch of `count` questions (default 3) for the given role and topic.
@@ -132,23 +138,27 @@ def get_questions(
     """
     role_filter = role or "Backend Engineer"
     topic_filter = topic or "Python / Data Structures"
-    
+    difficulty_filter = difficulty or "Medium"
+    excluded = set(json.loads(excluded_ids) if excluded_ids else [])
+
     questions_out: List[QuestionOut] = []
 
     # 1. Attempt fresh Gemini generation for the leading question
     try:
-        ai_q = generate_question(role=role_filter, topic=topic_filter)
-        questions_out.append(
-            QuestionOut(
-                question_id=_to_uuid(ai_q.id),
-                topic_id=_DEFAULT_TOPIC_ID,
-                role_id=_DEFAULT_ROLE_ID,
-                question_text=ai_q.question_text,
-                reference_answer=ai_q.reference_answer,
-                difficulty=ai_q.difficulty.lower(),
-                source="gemini",
+        ai_q = generate_question(role=role_filter, topic=topic_filter, difficulty=difficulty_filter)
+        q_id = _to_uuid(ai_q.id)
+        if str(q_id) not in excluded:
+            questions_out.append(
+                QuestionOut(
+                    question_id=q_id,
+                    topic_id=_DEFAULT_TOPIC_ID,
+                    role_id=_DEFAULT_ROLE_ID,
+                    question_text=ai_q.question_text,
+                    reference_answer=ai_q.reference_answer,
+                    difficulty=ai_q.difficulty.lower() if ai_q.difficulty else difficulty_filter.lower(),
+                    source="gemini",
+                )
             )
-        )
     except (GenerationError, Exception) as e:
         # Graceful fallback: log and continue to fill directly from bank
         pass
@@ -156,23 +166,30 @@ def get_questions(
     # 2. Retrieve remaining questions from ChromaDB Question Bank
     needed = count - len(questions_out)
     if needed > 0:
+        already_added = {str(q.question_id) for q in questions_out} | excluded
         bank_questions = vector_store.get_random_questions(
             role=role_filter,
             topic=topic_filter,
-            count=needed,
+            count=needed + 10,  # over-fetch to compensate for filtered-out duplicates
+            excluded_ids=already_added,
         )
-        
+
         for bq in bank_questions:
-            questions_out.append(
-                QuestionOut(
-                    question_id=_to_uuid(bq.id),
-                    topic_id=_DEFAULT_TOPIC_ID,
-                    role_id=_DEFAULT_ROLE_ID,
-                    question_text=bq.question_text,
-                    reference_answer=bq.reference_answer,
-                    difficulty=bq.difficulty.lower(),
-                    source="chromadb",
+            if len(questions_out) >= count:
+                break
+            bq_id = _to_uuid(bq.id)
+            if str(bq_id) not in already_added:
+                questions_out.append(
+                    QuestionOut(
+                        question_id=bq_id,
+                        topic_id=_DEFAULT_TOPIC_ID,
+                        role_id=_DEFAULT_ROLE_ID,
+                        question_text=bq.question_text,
+                        reference_answer=bq.reference_answer,
+                        difficulty=bq.difficulty.lower() if bq.difficulty else difficulty_filter.lower(),
+                        source="chromadb",
+                    )
                 )
-            )
+                already_added.add(str(bq_id))
 
     return questions_out
