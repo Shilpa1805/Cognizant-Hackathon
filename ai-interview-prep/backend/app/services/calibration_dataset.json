@@ -1,0 +1,268 @@
+[
+  {
+    "question_text": "How do you delete a node from a binary search tree?",
+    "reference_answer": "Find the node, then replace it with the leftmost node from its right subtree (or the rightmost node from its left subtree).",
+    "student_answer": "not answered",
+    "human_score": 0.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the role of a header-file?",
+    "reference_answer": "To store a class interface, including data members and member function prototypes.",
+    "student_answer": "contains all the standard C++ library's i.e. string",
+    "human_score": 0.2,
+    "source": "mohler"
+  },
+  {
+    "question_text": "How are objects initialized when they are created?",
+    "reference_answer": "By using constructors.",
+    "student_answer": "not answered",
+    "human_score": 0.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "How are objects initialized when they are created?",
+    "reference_answer": "By using constructors.",
+    "student_answer": "they are initialized to 0",
+    "human_score": 0.2,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What are the similarities between iteration and recursion?",
+    "reference_answer": "They both involve repetition; they both have termination tests; they can both occur infinitely.",
+    "student_answer": "not answered",
+    "human_score": 0.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is a recursive function?",
+    "reference_answer": "A function that calls itself.",
+    "student_answer": "not answered",
+    "human_score": 0.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the difference between a circular linked list and a basic linked list?",
+    "reference_answer": "The last element in a circular linked list points to the head of the list.",
+    "student_answer": "They are passed by reference because you want the function to change the pointer",
+    "human_score": 0.1,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the role of a header-file?",
+    "reference_answer": "To store a class interface, including data members and member function prototypes.",
+    "student_answer": "No",
+    "human_score": 0.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "How many steps does it take to search a node in a binary search tree?",
+    "reference_answer": "The height of the tree.",
+    "student_answer": "Given n elements, it would take n/2 steps to find the search criteria.",
+    "human_score": 0.3,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is a stack?",
+    "reference_answer": "A data structure that can store elements, which has the property that the last item added will be the first to be removed (or last-in-first-out)",
+    "student_answer": "Stores a set of element in a particular order",
+    "human_score": 0.4,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main difference between a string of characters that is read into a variable of type string versus a variable of type char[]?",
+    "reference_answer": "The char[] will automatically add a null \\0 character at the end of the string.",
+    "student_answer": "a string is a variable with a single entinty of letters combined into one while in a char[] each letter is assigned a memory value and each has its own variable assigned i.e. char[0] char[1].",
+    "human_score": 0.4,
+    "source": "mohler"
+  },
+  {
+    "question_text": "Where are variables declared in a C++ program?",
+    "reference_answer": "Variables can be declared anywhere in a program. They can be declared inside a function (local variables) or outside the functions (global variables)",
+    "student_answer": "at the top",
+    "human_score": 0.3,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main difference between strings declared using the type string versus strings declared using an array of characters?",
+    "reference_answer": "The strings declared using an array of characters have a null element added at the end of the array.",
+    "student_answer": "declaring a string, it includes white spaces but declaring a array of character does not include white spaces",
+    "human_score": 0.3,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main advantage of arrays over linked lists?",
+    "reference_answer": "The elements in an array can be accessed directly (as opposed to linked lists, which require iterative traversal).",
+    "student_answer": "You have to keep up with the head of the list.",
+    "human_score": 0.4,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What stages in the software life cycle are influenced by the testing stage?",
+    "reference_answer": "The testing stage can influence both the coding stage (phase 5) and the solution refinement stage (phase 7)",
+    "student_answer": "All stages are influenced except setting the program requirements. If a test fails, it can change the whole design, implementation, etc of a program as well as the final outcome.",
+    "human_score": 0.3,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main difference between a string of characters that is read into a variable of type string versus a variable of type char[]?",
+    "reference_answer": "The char[] will automatically add a null \\0 character at the end of the string.",
+    "student_answer": "When the string is passed into the array char, individual characters are stored and can be manipulated. Although when a word is stored into a string variable, it is stored as one word and not as individual characters.",
+    "human_score": 0.4,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What does the star (*) operator return?",
+    "reference_answer": "An alias (synonym) for the name of the object that its operand points to in memory. It is the dereferencing operator.",
+    "student_answer": "it returns the actual data at the address pointed to",
+    "human_score": 0.7,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What are the main advantages associated with object-oriented programming?",
+    "reference_answer": "Abstraction and reusability.",
+    "student_answer": "Data Abstraction and control... it is possible to isolate elements from other elements a lot easier and prevent tampering of data.",
+    "human_score": 0.7,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is a variable?",
+    "reference_answer": "A location in memory that can store a value.",
+    "student_answer": "A named object that can hold a numerical or letter value",
+    "human_score": 0.7,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What does the address (&) operator return?",
+    "reference_answer": "The memory address of its operand.",
+    "student_answer": "the ampersand (&) means \"pass by reference\". When the function is called, a pointer to the variable, instead of the variable itself, will be passed into the function.",
+    "human_score": 0.6,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main advantage associated with function arguments that are passed by reference?",
+    "reference_answer": "It avoids making copies of large data structures when calling functions.",
+    "student_answer": "You do not alter the original value of the variable that was passed.",
+    "human_score": 0.6,
+    "source": "mohler"
+  },
+  {
+    "question_text": "In one sentence, what is the main idea implemented by insertion sort?",
+    "reference_answer": "Taking one array element at a time, from left to right, it inserts it in the right position among the already sorted elements on its left.",
+    "student_answer": "Insert the item into its proper position by shifting larger sorted array values to the right.",
+    "human_score": 0.6,
+    "source": "mohler"
+  },
+  {
+    "question_text": "How can you implement a stack with a list?",
+    "reference_answer": "Keep the top of the stack pointing to the head of the linked list, so the push and pop operations will add or remove elements at the beginning of the list.",
+    "student_answer": "using linked list, you are pushing the node that contains each int to the stack until you get to the end of your linked list",
+    "human_score": 0.5,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the number of operations for insertion sort under a best-case scenario, and what is the best-case scenario?",
+    "reference_answer": "N (the length of the array) operations achieved for a sorted array.",
+    "student_answer": "1 where there is a list of two ints and only one must be moved.",
+    "human_score": 0.5,
+    "source": "mohler"
+  },
+  {
+    "question_text": "How can an array be addressed in pointer/offset notation?",
+    "reference_answer": "By initializing a pointer to point to the first element of the array, and then incrementing this pointer with the index of the array element.",
+    "student_answer": "by using the *(pointer + element-index)",
+    "human_score": 0.8,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the Euler tour traversal of a tree?",
+    "reference_answer": "A walk around the tree, starting with the root, where each node is seen three times: from the left, from below, from the right.",
+    "student_answer": "When you traverse a tree of any size you will visit each node three times. Its on the order of 3n or O(n) running time.",
+    "human_score": 0.8,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What operations would you need to perform to find a given element on a stack?",
+    "reference_answer": "Pop all the elements and store them on another stack until the element is found, then push back all the elements on the original stack.",
+    "student_answer": "Keep popping nodes and storing them in an alternate stack until the given element is found, then pop the given element and push the previously popped nodes back onto the stack.",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is a pointer?",
+    "reference_answer": "A variable that contains the address in memory of another variable.",
+    "student_answer": "A pointer is a reference to a location in memory",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the main difference between a string of characters that is read into a variable of type string versus a variable of type char[]?",
+    "reference_answer": "The char[] will automatically add a null \\0 character at the end of the string.",
+    "student_answer": "A string of characters is a specific variable type that has no extra data at the end. A string of type char[] is all the characters and a null ('\\0')",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What are the two main functions defined by a queue?",
+    "reference_answer": "enqueue and dequeue",
+    "student_answer": "The two functions are, Enqueue and Dequeue",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is the Euler tour traversal of a tree?",
+    "reference_answer": "A walk around the tree, starting with the root, where each node is seen three times: from the left, from below, from the right.",
+    "student_answer": "You recursively visit every node on the list. You visit the node from the left, the bottom, and from the right.",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "What is a recursive function?",
+    "reference_answer": "A function that calls itself.",
+    "student_answer": "A function that calls upon it self to solve a problem. Each time it calls upon it self it splits up a problem into a simplier form until it reaches a 'base case' which is the most simplest form of the problem.",
+    "human_score": 1.0,
+    "source": "mohler"
+  },
+  {
+    "question_text": "Tell me about a time you handled a tight project deadline with ambiguous requirements.",
+    "reference_answer": "Apply STAR methodology: proactively clarify scope with stakeholders, prioritize MVP features, communicate milestones transparently, and deliver on time.",
+    "student_answer": "I scheduled an alignment meeting with the product lead to define acceptance criteria, scoped down non-critical features, established daily check-ins, and shipped the release 2 days ahead of schedule.",
+    "human_score": 0.95,
+    "source": "handwritten"
+  },
+  {
+    "question_text": "Describe a situation where you had a disagreement with a team member.",
+    "reference_answer": "Use the STAR method: active listening, evaluating data/criteria objectively, remaining professional, reaching collaborative consensus.",
+    "student_answer": "I listened to their perspective, presented benchmark data objectively, and we compromised on a hybrid approach.",
+    "human_score": 0.9,
+    "source": "handwritten"
+  },
+  {
+    "question_text": "Tell me about a time you handled a tight project deadline with ambiguous requirements.",
+    "reference_answer": "Apply STAR methodology: proactively clarify scope with stakeholders, prioritize MVP features, communicate milestones transparently, and deliver on time.",
+    "student_answer": "I worked overtime to finish as many features as possible and asked questions whenever I got stuck.",
+    "human_score": 0.65,
+    "source": "handwritten"
+  },
+  {
+    "question_text": "How do you handle constructive criticism from a peer during a code review?",
+    "reference_answer": "Demonstrate humility, focus on code quality and standards rather than personal pride, ask clarifying questions, and implement feedback constructively.",
+    "student_answer": "I read through their suggestions and updated my pull request to adhere to the code styling conventions they mentioned.",
+    "human_score": 0.6,
+    "source": "handwritten"
+  },
+  {
+    "question_text": "Describe a situation where you had a disagreement with a team member.",
+    "reference_answer": "Use the STAR method: active listening, evaluating data/criteria objectively, remaining professional, reaching collaborative consensus.",
+    "student_answer": "I proved I was right and told them to follow my plan.",
+    "human_score": 0.3,
+    "source": "handwritten"
+  },
+  {
+    "question_text": "How do you handle constructive criticism from a peer during a code review?",
+    "reference_answer": "Demonstrate humility, focus on code quality and standards rather than personal pride, ask clarifying questions, and implement feedback constructively.",
+    "student_answer": "I usually ignore code review comments if my code already compiles and passes local unit tests.",
+    "human_score": 0.15,
+    "source": "handwritten"
+  }
+]
