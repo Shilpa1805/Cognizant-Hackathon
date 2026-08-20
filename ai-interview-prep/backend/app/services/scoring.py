@@ -96,8 +96,20 @@ def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[
     (via spaCy or regex heuristic) and checks presence in student answer.
     Returns (concept_match_score, matched_keywords, missing_keywords).
     """
-    if not reference_answer:
+    if not reference_answer or not reference_answer.strip():
         return (1.0, [], [])
+
+    # Try spaCy-powered concept_overlap service first
+    try:
+        from app.services.concept_overlap import concept_overlap, extract_concepts
+        res = concept_overlap(answer_text=answer_text, reference_answer=reference_answer)
+        score = float(res.get("score", 1.0))
+        missing = res.get("missing_concepts", [])
+        ref_concepts = extract_concepts(reference_answer)
+        matched = sorted([c for c in ref_concepts if c not in missing])
+        return (round(score, 3), matched, missing)
+    except Exception:
+        pass
 
     concepts = []
     if HAS_SPACY and _nlp:
