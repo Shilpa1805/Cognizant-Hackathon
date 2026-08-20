@@ -38,9 +38,7 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
-function pct(v: number | null) {
-  return v !== null && v !== undefined ? Math.round(v * 100) : null
-}
+
 
 export default function History() {
   const { user } = useAuth()

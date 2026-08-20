@@ -1,10 +1,13 @@
 import random
+import logging
 from pathlib import Path
 from typing import List, Optional, Tuple
 
 import chromadb
 
 from app.schemas import Question
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ChromaDB path
@@ -125,17 +128,23 @@ class VectorStoreService:
         if not results["ids"]:
             return []
 
-        return [
-            Question(
-                id=results["ids"][i],
-                role=results["metadatas"][i]["role"],
-                topic=results["metadatas"][i]["topic"],
-                difficulty=results["metadatas"][i]["difficulty"],
-                question_text=results["documents"][i],
-                reference_answer=results["metadatas"][i].get("reference_answer", ""),
+        questions = []
+        for i in range(len(results["ids"])):
+            q_id = results["ids"][i]
+            ref_ans = results["metadatas"][i].get("reference_answer", "")
+            if not ref_ans:
+                logger.warning("ChromaDB question id=%s is missing reference_answer in metadata.", q_id)
+            questions.append(
+                Question(
+                    id=q_id,
+                    role=results["metadatas"][i]["role"],
+                    topic=results["metadatas"][i]["topic"],
+                    difficulty=results["metadatas"][i]["difficulty"],
+                    question_text=results["documents"][i],
+                    reference_answer=ref_ans,
+                )
             )
-            for i in range(len(results["ids"]))
-        ]
+        return questions
 
     # ── Smart grounding (cascade fallback) ──────────────────────────────────
     def get_smart_grounding(

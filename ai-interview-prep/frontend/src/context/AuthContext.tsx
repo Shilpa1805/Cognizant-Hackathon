@@ -53,7 +53,6 @@ export const DEFAULT_ONBOARDING_DATA: OnboardingData = {
   focusTopics: ['dsa', 'system-design', 'behavioral'],
 }
 
-const DEFAULT_DEMO_TOKEN = 'demo-jwt-token'
 
 /**
  * AuthProvider — provides default demo user so all features can be demonstrated smoothly.

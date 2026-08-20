@@ -17,9 +17,7 @@ interface Question {
   source?: string
 }
 
-const ROLE_OPTIONS = [
-  'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
-]
+
 const TOPIC_OPTIONS = [
   'Python / Data Structures', 'System Design', 'Behavioral & Communication',
   'Databases', 'Operating Systems', 'Algorithms',
@@ -44,7 +42,7 @@ export default function Practice() {
   const { user, onboardingData } = useAuth()
 
   // Config state – pre-fill from onboarding
-  const [role, setRole] = useState(onboardingData?.targetRole || 'Backend Engineer')
+  const [role] = useState(onboardingData?.targetRole || 'Backend Engineer')
   const [topic, setTopic] = useState('Python / Data Structures')
   const [customTopic, setCustomTopic] = useState('')
   const [difficulty, setDifficulty] = useState('Medium')

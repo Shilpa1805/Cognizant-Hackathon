@@ -18,9 +18,7 @@ interface Question {
   reference_answer?: string
 }
 
-const ROLE_OPTIONS = [
-  'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
-]
+
 const TOPIC_OPTIONS = [
   'Python / Data Structures', 'System Design', 'Behavioral & Communication',
   'Databases', 'Operating Systems', 'Algorithms',
@@ -44,7 +42,7 @@ export default function MockInterview() {
   const { user, onboardingData } = useAuth()
 
   // Config state
-  const [role, setRole] = useState(onboardingData?.targetRole || 'Backend Engineer')
+  const [role] = useState(onboardingData?.targetRole || 'Backend Engineer')
   const [topic, setTopic] = useState('System Design')
   const [customTopic, setCustomTopic] = useState('')
   const [difficulty, setDifficulty] = useState('Medium')
@@ -294,7 +292,7 @@ export default function MockInterview() {
             Question {currentIdx + 1} of {questions.length} · {effectiveTopic} · {difficulty}
           </p>
         </div>
-        <div style={{ display: 'flex', align: 'center', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {/* Q progress dots */}
           <div style={{ display: 'flex', gap: '6px' }}>
             {questions.map((_, i) => (

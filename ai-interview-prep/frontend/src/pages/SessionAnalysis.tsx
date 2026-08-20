@@ -14,6 +14,7 @@ interface Score {
   fused_score: number | null
   feedback_text: string | null
   missing_keywords: string[] | null
+  matched_keywords?: string[] | null
   answer_explanation: string | null
   reference_answer: string | null
   hint?: {
@@ -112,7 +113,10 @@ export default function SessionAnalysis() {
           const fusedPct = pct(score?.fused_score ?? null)
           const simPct = pct(score?.similarity_score ?? null)
           const ref = score?.reference_answer || question?.reference_answer || null
-          const keywords = score?.hint?.connecting_keywords || score?.missing_keywords || []
+          const connecting = (score?.hint?.connecting_keywords?.length ? score.hint.connecting_keywords : score?.matched_keywords) ?? []
+          const missing = score?.missing_keywords ?? []
+          const hasConnecting = connecting.length > 0
+          const hasMissing = missing.length > 0
           const tips = score?.hint?.tips_and_tricks || []
 
           return (
@@ -180,12 +184,24 @@ export default function SessionAnalysis() {
                   </div>
                 )}
 
-                {/* Key hints / keywords */}
-                {keywords && keywords.length > 0 && (
+                {/* Concepts You Covered */}
+                {hasConnecting && (
                   <div className={styles.section}>
-                    <h4 className={styles.sectionLabel}>🔑 Key Concepts to Remember</h4>
+                    <h4 className={styles.sectionLabel} style={{ color: 'var(--color-success)' }}>✅ Concepts You Covered</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
-                      {keywords.map((kw: string) => (
+                      {connecting.map((kw: string) => (
+                        <Badge key={kw} variant="easy">{kw}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Concepts to Review */}
+                {hasMissing && (
+                  <div className={styles.section}>
+                    <h4 className={styles.sectionLabel} style={{ color: 'var(--color-warning)' }}>🔑 Concepts to Review</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '6px' }}>
+                      {missing.map((kw: string) => (
                         <Badge key={kw} variant="medium">{kw}</Badge>
                       ))}
                     </div>
