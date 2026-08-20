@@ -5,164 +5,165 @@ Provides topic-wise progress aggregation, priority rankings, and custom study pl
 
 import uuid
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List
 
-from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.database import get_db
-from app.models.progress import TopicProgress as TopicProgressModel, StudyPlan as StudyPlanModel
+from app.models.answer import Answer as AnswerModel
+from app.models.progress import StudyPlan as StudyPlanModel
+from app.models.progress import TopicProgress as TopicProgressModel
 from app.models.question import Question as QuestionModel
 from app.models.role_topic import Topic as TopicModel
-from app.models.answer import Answer as AnswerModel
 from app.models.score import Score as ScoreModel
-from app.schemas.dashboard import TopicProgressOut, StudyPlanOut
+from app.models.session import MockSession as MockSessionModel
+from app.schemas.dashboard import (
+    DashboardSessionHistoryOut,
+    DashboardStudyPlanItemOut,
+    DashboardSummaryOut,
+    DashboardTopicAverageOut,
+    StudyPlanOut,
+    TopicProgressOut,
+)
 
 router = APIRouter()
 
-
-class TopicSummaryItem(BaseModel):
-    topic_id: uuid.UUID
-    topic_name: str
-    category: Optional[str] = "Technical"
-    avg_score: float
-    attempts_count: int
-    question_frequency: int
-    priority_score: float
-    priority_rank: int
+DEFAULT_USER_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
-class DashboardSummaryResponse(BaseModel):
-    user_id: uuid.UUID
-    overall_avg_score: float
-    total_answers: int
-    topic_summaries: List[TopicSummaryItem]
-    study_plan: List[Dict[str, Any]]
+def _build_recommended_focus(avg_score: float, question_frequency: int) -> str:
+    if avg_score < 40.0:
+        return (
+            f"High priority: rebuild fundamentals and do intensive drills "
+            f"(avg {avg_score:.2f}%, {question_frequency} questions in bank)."
+        )
+    if avg_score < 70.0:
+        return (
+            f"Medium priority: strengthen weak patterns and practice mixed difficulty "
+            f"(avg {avg_score:.2f}%, {question_frequency} questions in bank)."
+        )
+    return (
+        f"Maintenance priority: keep this topic warm with spaced revision "
+        f"(avg {avg_score:.2f}%, {question_frequency} questions in bank)."
+    )
 
 
-_DEFAULT_RESOURCES = {
-    "Data Structures & Algorithms": [
-        "LeetCode Top 100 Liked Questions",
-        "NeetCode 150 Roadmap",
-        "CLRS Algorithms Handbook"
-    ],
-    "System Design": [
-        "Designing Data-Intensive Applications (Kleppmann)",
-        "System Design Primer (GitHub)",
-        "ByteByteGo System Design Course"
-    ],
-    "Behavioral & Communication": [
-        "STAR Method Response Guide",
-        "Amazon 16 Leadership Principles",
-        "Mock Behavioral Interview Exercises"
-    ],
-    "Databases": [
-        "Use The Index, Luke! SQL Tuning",
-        "CMU 15-445 Database Systems lectures",
-        "PostgreSQL Internals Guide"
-    ],
-    "Operating Systems": [
-        "Operating Systems: Three Easy Pieces (OSTEP)",
-        "Linux Kernel Development (Love)",
-        "Process vs Thread Synchronization Guide"
+@router.get("/dashboard/summary", response_model=DashboardSummaryOut)
+def get_dashboard_summary(db: Session = Depends(get_db)) -> DashboardSummaryOut:
+    """
+    Pod 3 core endpoint for PrepIQ dashboard.
+    Uses a hardcoded demo user and computes topic averages from Score rows.
+    """
+    score_value = func.coalesce(ScoreModel.human_calibrated_score, ScoreModel.fused_score)
+
+    topic_frequency_subquery = (
+        db.query(
+            QuestionModel.topic_id.label("topic_id"),
+            func.count(QuestionModel.question_id).label("question_frequency"),
+        )
+        .group_by(QuestionModel.topic_id)
+        .subquery()
+    )
+
+    topic_rows = (
+        db.query(
+            TopicModel.topic_id.label("topic_id"),
+            TopicModel.topic_name.label("topic_name"),
+            (func.avg(score_value) * 100.0).label("avg_score"),
+            topic_frequency_subquery.c.question_frequency.label("question_frequency"),
+        )
+        .join(QuestionModel, QuestionModel.topic_id == TopicModel.topic_id)
+        .join(AnswerModel, AnswerModel.question_id == QuestionModel.question_id)
+        .join(ScoreModel, ScoreModel.answer_id == AnswerModel.answer_id)
+        .join(topic_frequency_subquery, topic_frequency_subquery.c.topic_id == TopicModel.topic_id)
+        .filter(
+            AnswerModel.user_id == DEFAULT_USER_ID,
+            score_value.isnot(None),
+        )
+        .group_by(
+            TopicModel.topic_id,
+            TopicModel.topic_name,
+            topic_frequency_subquery.c.question_frequency,
+        )
+        .all()
+    )
+
+    ordered_topics = sorted(
+        topic_rows,
+        key=lambda row: (float(row.avg_score), -int(row.question_frequency), row.topic_name),
+    )
+
+    topic_average_scores = [
+        DashboardTopicAverageOut(
+            topic_id=row.topic_id,
+            topic_name=row.topic_name,
+            avg_score=round(float(row.avg_score), 2),
+            question_frequency=int(row.question_frequency),
+        )
+        for row in ordered_topics
     ]
-}
 
-
-@router.get("/dashboard/summary", response_model=DashboardSummaryResponse)
-def get_dashboard_summary(
-    user_id: Optional[uuid.UUID] = Query(None, description="User UUID"),
-    db: Session = Depends(get_db)
-) -> DashboardSummaryResponse:
-    """
-    Pod 3 Core Endpoint: GET /dashboard/summary
-    Aggregates student scores by topic, computes average score per topic,
-    calculates priority ranking (topics that are low-scoring and frequent rank #1),
-    and returns comprehensive dashboard summary.
-    """
-    target_user_id = user_id or uuid.UUID("00000000-0000-0000-0000-000000000001")
-
-    # 1. Fetch all topics from DB
-    topics = db.query(TopicModel).all()
-    if not topics:
-        # Fallback topics
-        topics = [
-            TopicModel(topic_id=uuid.UUID("22222222-2222-2222-2222-000000000001"), topic_name="Data Structures & Algorithms", category="Technical"),
-            TopicModel(topic_id=uuid.UUID("22222222-2222-2222-2222-000000000002"), topic_name="System Design", category="Technical"),
-            TopicModel(topic_id=uuid.UUID("22222222-2222-2222-2222-000000000003"), topic_name="Behavioral & Communication", category="Behavioral"),
-        ]
-
-    # 2. Count question frequency per topic in bank
-    freq_query = db.query(QuestionModel.topic_id, func.count(QuestionModel.question_id)).group_by(QuestionModel.topic_id).all()
-    freq_map = {t_id: count for t_id, count in freq_query}
-
-    # 3. Fetch user progress records
-    progress_records = db.query(TopicProgressModel).filter(TopicProgressModel.user_id == target_user_id).all()
-    progress_map = {p.topic_id: p for p in progress_records}
-
-    summaries = []
-    total_score_sum = 0.0
-    total_answers_count = 0
-
-    for t in topics:
-        tp = progress_map.get(t.topic_id)
-        avg = tp.avg_score if tp and tp.avg_score is not None else 50.0
-        attempts = tp.attempts_count if tp else 0
-        freq = freq_map.get(t.topic_id, 3)
-
-        # Priority calculation formula: Priority = (100.0 - avg_score) * (freq + 1)
-        priority_val = (100.0 - avg) * (freq + 1)
-
-        summaries.append({
-            "topic_id": t.topic_id,
-            "topic_name": t.topic_name,
-            "category": t.category or "Technical",
-            "avg_score": round(avg, 2),
-            "attempts_count": attempts,
-            "question_frequency": freq,
-            "priority_score": round(priority_val, 2),
-        })
-
-        total_score_sum += avg
-        total_answers_count += attempts
-
-    # Sort topics by priority_score descending (highest priority to study first)
-    summaries.sort(key=lambda x: x["priority_score"], reverse=True)
-
-    topic_summary_items = []
-    study_plan_items = []
-
-    for rank, item in enumerate(summaries, start=1):
-        topic_summary_items.append(TopicSummaryItem(
-            topic_id=item["topic_id"],
-            topic_name=item["topic_name"],
-            category=item["category"],
-            avg_score=item["avg_score"],
-            attempts_count=item["attempts_count"],
-            question_frequency=item["question_frequency"],
-            priority_score=item["priority_score"],
+    study_plan = [
+        DashboardStudyPlanItemOut(
+            topic_id=row.topic_id,
+            topic_name=row.topic_name,
             priority_rank=rank,
-        ))
+            recommended_focus=_build_recommended_focus(
+                avg_score=round(float(row.avg_score), 2),
+                question_frequency=int(row.question_frequency),
+            ),
+            avg_score=round(float(row.avg_score), 2),
+            question_frequency=int(row.question_frequency),
+        )
+        for rank, row in enumerate(ordered_topics, start=1)
+    ]
 
-        study_plan_items.append({
-            "priority_rank": rank,
-            "topic_id": str(item["topic_id"]),
-            "topic_name": item["topic_name"],
-            "avg_score": item["avg_score"],
-            "reason": f"Rank #{rank}: Low score ({item['avg_score']}%) with high question frequency ({item['question_frequency']} in bank)",
-            "recommended_resources": _DEFAULT_RESOURCES.get(item["topic_name"], ["Core documentation and practice questions"]),
-        })
+    session_rows = (
+        db.query(
+            MockSessionModel.session_id.label("session_id"),
+            MockSessionModel.started_at.label("started_at"),
+            MockSessionModel.ended_at.label("ended_at"),
+            (func.avg(score_value) * 100.0).label("overall_session_score"),
+        )
+        .outerjoin(
+            AnswerModel,
+            and_(
+                AnswerModel.session_id == MockSessionModel.session_id,
+                AnswerModel.user_id == DEFAULT_USER_ID,
+            ),
+        )
+        .outerjoin(ScoreModel, ScoreModel.answer_id == AnswerModel.answer_id)
+        .filter(MockSessionModel.user_id == DEFAULT_USER_ID)
+        .group_by(
+            MockSessionModel.session_id,
+            MockSessionModel.started_at,
+            MockSessionModel.ended_at,
+        )
+        .order_by(MockSessionModel.started_at.desc())
+        .all()
+    )
 
-    overall_avg = round(total_score_sum / len(topics), 2) if topics else 0.0
+    session_history = [
+        DashboardSessionHistoryOut(
+            session_id=row.session_id,
+            started_at=row.started_at,
+            ended_at=row.ended_at,
+            overall_session_score=(
+                round(float(row.overall_session_score), 2)
+                if row.overall_session_score is not None
+                else None
+            ),
+        )
+        for row in session_rows
+    ]
 
-    return DashboardSummaryResponse(
-        user_id=target_user_id,
-        overall_avg_score=overall_avg,
-        total_answers=total_answers_count,
-        topic_summaries=topic_summary_items,
-        study_plan=study_plan_items,
+    return DashboardSummaryOut(
+        user_id=DEFAULT_USER_ID,
+        topic_average_scores=topic_average_scores,
+        study_plan=study_plan,
+        session_history=session_history,
     )
 
 
@@ -173,7 +174,6 @@ def get_dashboard(user_id: uuid.UUID, db: Session = Depends(get_db)) -> List[Top
     if records:
         return records
 
-    # Fallback response
     topics = db.query(TopicModel).all()
     return [
         TopicProgressOut(
@@ -191,18 +191,20 @@ def get_dashboard(user_id: uuid.UUID, db: Session = Depends(get_db)) -> List[Top
 @router.get("/study-plan/{user_id}", response_model=List[StudyPlanOut])
 def get_study_plan(user_id: uuid.UUID, db: Session = Depends(get_db)) -> List[StudyPlanOut]:
     """Query or generate prioritised study plan for user."""
-    summary = get_dashboard_summary(user_id=user_id, db=db)
-    
-    study_plan_rows = []
-    for item in summary.study_plan:
-        t_id = uuid.UUID(item["topic_id"])
-        study_plan_rows.append(StudyPlanOut(
+    persisted_plan = db.query(StudyPlanModel).filter(StudyPlanModel.user_id == user_id).all()
+    if persisted_plan:
+        return persisted_plan
+
+    summary = get_dashboard_summary(db=db)
+
+    return [
+        StudyPlanOut(
             id=uuid.uuid4(),
             user_id=user_id,
-            topic_id=t_id,
-            priority_rank=item["priority_rank"],
-            recommended_resources=item["recommended_resources"],
+            topic_id=item.topic_id,
+            priority_rank=item.priority_rank,
+            recommended_resources=[item.recommended_focus],
             generated_at=datetime.utcnow(),
-        ))
-    return study_plan_rows
-
+        )
+        for item in summary.study_plan
+    ]
