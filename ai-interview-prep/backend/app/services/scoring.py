@@ -55,8 +55,19 @@ def compute_similarity(text_a: str, text_b: str) -> float:
     """
     Embedding similarity signal — runs 100% offline, zero external API call.
     Uses sentence-transformers if available, with TF-IDF / word overlap fallback.
+    Calibrated so unrelated text and non-answers drop cleanly to 0.0.
     """
     if not text_a or not text_b:
+        return 0.0
+
+    # Non-answer guard: trivial or evasive answers should have zero similarity
+    TRIVIAL_NON_ANSWERS = {
+        "idk", "i don't know", "i dont know", "no idea", "dont know", "don't know",
+        "pass", "skip", "na", "n/a", "none", "no", "nothing", "not sure", "im not sure",
+        "i'm not sure", "huh", "dunno", "idk.", "i don't know.", "i dont know.", "whatever"
+    }
+    clean_a = text_a.strip().lower().rstrip(".!?,")
+    if clean_a in TRIVIAL_NON_ANSWERS or len(clean_a) < 2:
         return 0.0
 
     if HAS_SENTENCE_TRANSFORMERS and _st_model is not None:
@@ -66,8 +77,11 @@ def compute_similarity(text_a: str, text_b: str) -> float:
             norm_a = np.linalg.norm(emb_a)
             norm_b = np.linalg.norm(emb_b)
             if norm_a > 0 and norm_b > 0:
-                sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
-                return max(0.0, min(1.0, (sim + 1.0) / 2.0))
+                raw_sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
+                # Calibrate: raw cosine <= 0.20 indicates noise / no semantic overlap (0.0).
+                # Rescale [0.20, 1.00] linearly to [0.0, 1.0].
+                calibrated = max(0.0, (raw_sim - 0.20) / 0.80)
+                return round(min(1.0, calibrated), 3)
         except Exception as exc:
             print(f"SentenceTransformer similarity error: {exc}. Using TF-IDF fallback.")
 
