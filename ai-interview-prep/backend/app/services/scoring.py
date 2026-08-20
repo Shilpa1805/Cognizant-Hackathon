@@ -10,7 +10,10 @@ Scoring Service — 3-Signal Hybrid Scoring Engine
 import os
 import re
 import json
+import logging
 from typing import List, Tuple, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 # Signal 1: Sentence Transformers & Scikit-Learn
 try:
@@ -52,8 +55,19 @@ def compute_similarity(text_a: str, text_b: str) -> float:
     """
     Embedding similarity signal — runs 100% offline, zero external API call.
     Uses sentence-transformers if available, with TF-IDF / word overlap fallback.
+    Calibrated so unrelated text and non-answers drop cleanly to 0.0.
     """
     if not text_a or not text_b:
+        return 0.0
+
+    # Non-answer guard: trivial or evasive answers should have zero similarity
+    TRIVIAL_NON_ANSWERS = {
+        "idk", "i don't know", "i dont know", "no idea", "dont know", "don't know",
+        "pass", "skip", "na", "n/a", "none", "no", "nothing", "not sure", "im not sure",
+        "i'm not sure", "huh", "dunno", "idk.", "i don't know.", "i dont know.", "whatever"
+    }
+    clean_a = text_a.strip().lower().rstrip(".!?,")
+    if clean_a in TRIVIAL_NON_ANSWERS or len(clean_a) < 2:
         return 0.0
 
     if HAS_SENTENCE_TRANSFORMERS and _st_model is not None:
@@ -63,8 +77,11 @@ def compute_similarity(text_a: str, text_b: str) -> float:
             norm_a = np.linalg.norm(emb_a)
             norm_b = np.linalg.norm(emb_b)
             if norm_a > 0 and norm_b > 0:
-                sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
-                return max(0.0, min(1.0, (sim + 1.0) / 2.0))
+                raw_sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
+                # Calibrate: raw cosine <= 0.20 indicates noise / no semantic overlap (0.0).
+                # Rescale [0.20, 1.00] linearly to [0.0, 1.0].
+                calibrated = max(0.0, (raw_sim - 0.20) / 0.80)
+                return round(min(1.0, calibrated), 3)
         except Exception as exc:
             print(f"SentenceTransformer similarity error: {exc}. Using TF-IDF fallback.")
 
@@ -93,8 +110,20 @@ def concept_match(answer_text: str, reference_answer: str) -> Tuple[float, List[
     (via spaCy or regex heuristic) and checks presence in student answer.
     Returns (concept_match_score, matched_keywords, missing_keywords).
     """
-    if not reference_answer:
+    if not reference_answer or not reference_answer.strip():
         return (1.0, [], [])
+
+    # Try spaCy-powered concept_overlap service first
+    try:
+        from app.services.concept_overlap import concept_overlap, extract_concepts
+        res = concept_overlap(answer_text=answer_text, reference_answer=reference_answer)
+        score = float(res.get("score", 1.0))
+        missing = res.get("missing_concepts", [])
+        ref_concepts = extract_concepts(reference_answer)
+        matched = sorted([c for c in ref_concepts if c not in missing])
+        return (round(score, 3), matched, missing)
+    except Exception:
+        pass
 
     concepts = []
     if HAS_SPACY and _nlp:
@@ -138,7 +167,11 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
     and return constructive feedback, answer explanation, and tips/tricks.
     Returns (score, feedback, answer_explanation, tips_and_tricks).
     """
-    api_key = os.environ.get("GEMINI_API_KEY")
+    try:
+        from app.config import settings
+        api_key = settings.GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY")
+    except Exception:
+        api_key = os.environ.get("GEMINI_API_KEY")
     if HAS_GENAI and api_key:
         try:
             client = genai.Client(api_key=api_key)
@@ -154,10 +187,17 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                 f"- 'tips_and_tricks': JSON array of 1-3 short actionable tips for answering this type of question well"
             )
 
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt
-            )
+            response = None
+            for model_name in ["gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-flash-latest"]:
+                try:
+                    response = client.models.generate_content(
+                        model=model_name,
+                        contents=prompt
+                    )
+                    if response and response.text:
+                        break
+                except Exception:
+                    continue
 
             if response and response.text:
                 cleaned = response.text.strip()
@@ -174,22 +214,46 @@ def llm_judge(answer_text: str, reference_answer: str, question_text: str) -> Tu
                 tips_and_tricks = [str(t) for t in tips_raw] if isinstance(tips_raw, list) else []
                 return (max(0.0, min(1.0, score)), feedback, answer_explanation, tips_and_tricks)
         except Exception as exc:
-            print(f"LLM Judge error: {exc}. Using heuristic rating.")
+            logger.warning(
+                "LLM Judge Gemini call failed (%s: %s). Falling back to heuristic.",
+                type(exc).__name__, exc,
+                exc_info=True,
+            )
 
-    # Fallback heuristic judge when LLM is unavailable
-    words_count = len(answer_text.split())
-    if words_count < 5:
-        score = 0.30
-        feedback = "Your answer is very brief. Provide more explanation and technical detail."
-    elif words_count < 15:
-        score = 0.60
-        feedback = "Solid basic answer. Consider expanding on trade-offs and specific examples."
+    # ---------------------------------------------------------------------------
+    # Fallback heuristic — continuous score based on word count + lexical overlap
+    # against reference_answer (or question_text when reference is missing).
+    # This replaces the 3-bucket approach that collapsed 30% of fused_score.
+    # ---------------------------------------------------------------------------
+    compare_text = reference_answer if reference_answer else question_text
+    words_answer = re.findall(r'\w+', answer_text.lower())
+    words_ref    = set(re.findall(r'\w+', compare_text.lower())) if compare_text else set()
+    word_count   = len(words_answer)
+
+    # Word-count component: asymptotically approaches 1.0; saturates ~80 words
+    length_score = min(1.0, word_count / 80.0)
+
+    # Lexical-overlap component: fraction of reference words present in answer
+    if words_ref:
+        overlap = len(set(words_answer) & words_ref) / len(words_ref)
     else:
-        score = 0.80
-        feedback = "Good, detailed response covering key points."
+        overlap = length_score  # no reference — fall back to length only
+
+    # Combine: 40% length + 60% overlap, clamp to [0.1, 0.95]
+    raw_score = (0.40 * length_score) + (0.60 * overlap)
+    score     = round(max(0.10, min(0.95, raw_score)), 3)
+
+    if score >= 0.75:
+        feedback = "Strong, detailed answer covering the key concepts well."
+    elif score >= 0.50:
+        feedback = "Solid attempt. Expand on technical depth, trade-offs, and examples."
+    elif score >= 0.25:
+        feedback = "Partial answer. Review the reference solution and cover more key points."
+    else:
+        feedback = "Very brief or off-topic. Provide a detailed technical explanation."
 
     answer_explanation = ""
-    tips_and_tricks = []
+    tips_and_tricks    = []
     return (score, feedback, answer_explanation, tips_and_tricks)
 
 
@@ -203,6 +267,16 @@ def score_answer(
     Combines similarity_score, concept_match_score, and llm_judge_score into fused_score.
     Returns dict matching Score ORM model fields.
     """
+    # Warn when reference_answer is missing — scoring compares against question text
+    # which produces weaker/clustered signals. Track this in logs to quantify coverage.
+    if not reference_answer:
+        logger.warning(
+            "score_answer: reference_answer is empty for question=%r — "
+            "falling back to question_text for similarity and concept signals. "
+            "Scores may be less discriminative.",
+            question_text[:80] if question_text else "<unknown>",
+        )
+
     # 1. Similarity Score (offline)
     sim_score = compute_similarity(answer_text, reference_answer or question_text)
 

@@ -5,14 +5,16 @@ GET /questions       — returns a list of questions (bulk endpoint).
 """
 
 import uuid
+import json
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Query
-import json
 
 from app.schemas.questions import QuestionOut
 from app.services.vector_store import vector_store
 from app.services.question_generation import generate_question, GenerationError
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 # Default fallback UUIDs for frontend/database compatibility
@@ -87,9 +89,11 @@ def next_question(
             source="gemini",
         )
     except (GenerationError, Exception) as exc:
-        import logging
-        logging.getLogger(__name__).warning("Gemini failed, falling back. Error: %s", repr(exc))
-        pass  # fall through to ChromaDB
+        logger.warning(
+            "Gemini question generation failed (%s: %s). Falling back to ChromaDB.",
+            type(exc).__name__, exc,
+            exc_info=True,
+        )
 
     # --- Attempt 2: ChromaDB bank (Person 1) ---
     bank = vector_store.get_random_questions(
@@ -159,9 +163,12 @@ def get_questions(
                     source="gemini",
                 )
             )
-    except (GenerationError, Exception) as e:
-        # Graceful fallback: log and continue to fill directly from bank
-        pass
+    except (GenerationError, Exception) as exc:
+        logger.warning(
+            "Gemini leading question generation failed (%s: %s). Falling back to ChromaDB bank.",
+            type(exc).__name__, exc,
+            exc_info=True,
+        )
 
     # 2. Retrieve remaining questions from ChromaDB Question Bank
     needed = count - len(questions_out)
