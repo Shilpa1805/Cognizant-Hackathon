@@ -1,0 +1,135 @@
+/* Feedback.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.header {
+  margin-bottom: var(--space-8);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-light);
+  margin-bottom: var(--space-4);
+}
+
+/* Score rows */
+.scoreRows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.scoreRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.scoreLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.progressContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+  max-width: 240px;
+}
+
+.progressBarBg {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-full);
+}
+
+.scoreVal {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-light);
+  width: 42px;
+  text-align: right;
+}
+
+/* Feedback blocks */
+.feedbackBlock {
+  background: var(--accent-dim);
+  border: 1px solid rgba(160, 104, 255, 0.3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.feedbackText {
+  font-size: var(--text-sm);
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+.keywordsWrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}

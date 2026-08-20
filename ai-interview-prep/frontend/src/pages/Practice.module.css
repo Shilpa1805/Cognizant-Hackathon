@@ -1,0 +1,141 @@
+/* Practice.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.titleSection {
+  margin-bottom: var(--space-8);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Filters section for choosing what to practice */
+.filtersRow {
+  display: flex;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filterGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.filterLabel {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.select {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  color: var(--text-light);
+  font-size: var(--text-sm);
+  outline: none;
+  cursor: pointer;
+  min-width: 160px;
+}
+
+.select option {
+  background: var(--bg-dark-alt);
+  color: var(--text-light);
+}
+
+.select:focus {
+  border-color: var(--accent);
+}
+
+/* Main workspace */
+.workspace {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--space-8);
+}
+
+@media (max-width: 1024px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.cardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.cardTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.questionText {
+  font-size: var(--text-base);
+  color: var(--text-light);
+  line-height: 1.6;
+}
+
+.textarea {
+  width: 100%;
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  color: var(--text-light);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  outline: none;
+  resize: vertical;
+  min-height: 200px;
+  transition: all var(--dur-fast);
+}
+
+.textarea:focus {
+  border-color: var(--accent);
+  background: rgba(160, 104, 255, 0.04);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: flex-end;
+}

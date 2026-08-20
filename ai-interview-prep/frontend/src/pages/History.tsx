@@ -1,11 +1,7 @@
-/**
- * History page — shows past mock sessions.
- * TODO(frontend-pair): Fetch real session history from GET /sessions once
- *                      the sessions-pair adds that endpoint.
- * TODO(sessions-pair): Add GET /sessions?user_id= endpoint.
- */
+import Card from '../components/Card'
+import Badge from '../components/Badge'
+import styles from './History.module.css'
 
-// Mock session data — replace with real API call
 const MOCK_SESSIONS = [
   {
     session_id: 'sess-001',
@@ -45,37 +41,33 @@ function formatDate(iso: string) {
 
 export default function History() {
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Session History</h1>
+    <div className={styles.container}>
+      <h1 className={styles.title}>Session History</h1>
+      <p className={styles.subtitle}>Review your historical mock attempts and evaluations.</p>
 
-      <div className="space-y-4">
+      <div className={styles.list}>
         {MOCK_SESSIONS.map((s) => (
-          <div key={s.session_id} className="bg-white rounded-2xl shadow p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="font-semibold text-gray-800">{s.role}</h2>
-                <p className="text-xs text-gray-400 mt-0.5">{formatDate(s.started_at)}</p>
+          <Card key={s.session_id} className={styles.item}>
+            <div className={styles.info}>
+              <span className={styles.roleName}>{s.role}</span>
+              <span className={styles.date}>{formatDate(s.started_at)}</span>
+              <div className={styles.stats} style={{ marginTop: 'var(--space-2)' }}>
+                <span className={styles.statVal}>
+                  Questions: <span style={{ color: 'var(--accent)' }}>{s.question_count}</span>
+                </span>
+                <span className={styles.statVal}>
+                  Avg Rating:{' '}
+                  <span style={{ color: s.avg_score !== null ? 'var(--color-success)' : 'var(--text-subtle)' }}>
+                    {s.avg_score !== null ? `${Math.round(s.avg_score * 100)}%` : '—'}
+                  </span>
+                </span>
               </div>
-              <span
-                className={`text-xs font-semibold px-2 py-1 rounded-full ${
-                  s.status === 'completed'
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-amber-100 text-amber-700'
-                }`}
-              >
-                {s.status}
-              </span>
             </div>
-            <div className="flex gap-6 mt-3 text-sm text-gray-600">
-              <span>{s.question_count} question{s.question_count !== 1 ? 's' : ''}</span>
-              <span>
-                Avg score:{' '}
-                {s.avg_score !== null
-                  ? `${Math.round(s.avg_score * 100)}%`
-                  : '—'}
-              </span>
-            </div>
-          </div>
+
+            <Badge variant={s.status === 'completed' ? 'easy' : 'medium'}>
+              {s.status}
+            </Badge>
+          </Card>
         ))}
       </div>
     </div>

@@ -1,8 +1,12 @@
+/* PrepPilot — Entry CSS
+   Import design tokens and global styles first.
+   Tailwind directives kept so the build config stays intact.
+   All new/rewritten components use CSS modules — no Tailwind. */
+
+@import './styles/tokens.css';
+@import './styles/global.css';
+
+/* Tailwind (kept for legacy compatibility — not used in new components) */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Global resets / base styles — frontend pairs own this file */
-body {
-  @apply bg-gray-50 text-gray-900 antialiased;
-}

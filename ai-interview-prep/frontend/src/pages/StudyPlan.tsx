@@ -1,39 +1,37 @@
 import { useEffect, useState } from 'react'
+import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
+import Card from '../components/Card'
+import Button from '../components/Button'
+import { useNavigate } from 'react-router-dom'
+import styles from './StudyPlan.module.css'
 
-interface StudyPlanItem {
-  id: string
-  topic_id: string
+interface StudyPlanEntry {
   priority_rank: number
-  recommended_resources: string[] | null
-  generated_at: string
+  topic_id: string
+  topic_name: string
+  avg_score: number
+  reason: string
+  recommended_resources: string[]
 }
 
-const TOPIC_NAMES: Record<string, string> = {
-  '22222222-2222-2222-2222-222222222222': 'Operating Systems',
-  '33333333-3333-3333-3333-333333333333': 'System Design',
-  '44444444-4444-4444-4444-444444444444': 'Databases',
-  '55555555-5555-5555-5555-555555555555': 'Algorithms',
-  '66666666-6666-6666-6666-666666666666': 'Behavioural',
-}
-
-const STUB_USER_ID = '00000000-0000-0000-0000-000000000002'
-
-/**
- * StudyPlan page — shows a prioritised list of topics with resources.
- * TODO(frontend-pair): Add ability to mark topics as done / snooze.
- * TODO(dashboard-pair): Replace stub with real study plan generation.
- */
 export default function StudyPlan() {
-  const [plan, setPlan] = useState<StudyPlanItem[]>([])
+  const { user } = useAuth()
+  const navigate = useNavigate()
+  const [plan, setPlan] = useState<StudyPlanEntry[]>([])
   const [loading, setLoading] = useState(true)
+
+  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
 
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await api.get(`/study-plan/${STUB_USER_ID}`)
-        const sorted = [...data].sort(
-          (a: StudyPlanItem, b: StudyPlanItem) => a.priority_rank - b.priority_rank,
+        // Use /dashboard/summary which returns study_plan with real topic_names already resolved
+        const { data } = await api.get('/dashboard/summary', {
+          params: { user_id: userId },
+        })
+        const sorted = [...(data.study_plan ?? [])].sort(
+          (a: StudyPlanEntry, b: StudyPlanEntry) => a.priority_rank - b.priority_rank,
         )
         setPlan(sorted)
       } catch (err) {
@@ -43,54 +41,90 @@ export default function StudyPlan() {
       }
     }
     load()
-  }, [])
+  }, [userId])
 
-  if (loading) return <p className="text-gray-500">Loading study plan…</p>
+  if (loading) {
+    return (
+      <div className={styles.container}>
+        <div className="skeleton" style={{ width: '240px', height: '40px', marginBottom: '16px' }} />
+        <div className="skeleton" style={{ height: '360px' }} />
+      </div>
+    )
+  }
 
   return (
-    <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-800 mb-2">Your Study Plan</h1>
-      <p className="text-sm text-gray-500 mb-6">
-        Topics ranked by priority — focus on the top items first.
+    <div className={styles.container}>
+      <h1 className={styles.title}>Your Study Plan</h1>
+      <p className={styles.subtitle}>
+        AI-prioritised topics based on your actual performance scores. Tackle the top items first.
       </p>
 
-      <ol className="space-y-4">
-        {plan.map((item) => (
-          <li
-            key={item.id}
-            className="bg-white rounded-2xl shadow p-5 flex gap-4"
-          >
-            <span className="text-2xl font-bold text-indigo-200 w-8 shrink-0 text-center">
-              {item.priority_rank}
-            </span>
-            <div className="flex-1">
-              <h2 className="font-semibold text-gray-800 mb-2">
-                {TOPIC_NAMES[item.topic_id] ?? 'Unknown Topic'}
-              </h2>
-              {item.recommended_resources && item.recommended_resources.length > 0 && (
-                <ul className="space-y-1">
-                  {item.recommended_resources.map((r) => (
-                    <li key={r} className="text-sm text-indigo-600">
-                      {r.startsWith('http') ? (
-                        <a
-                          href={r}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="hover:underline"
-                        >
-                          🔗 {r}
-                        </a>
-                      ) : (
-                        <span className="text-gray-600">📖 {r}</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
+      {plan.length === 0 ? (
+        <Card variant="nohover" style={{ textAlign: 'center', padding: 'var(--space-12)' }}>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 'var(--space-4)' }}>
+            No study plan data yet. Start practising to generate your personalised plan!
+          </p>
+          <Button variant="primary" withBorder onClick={() => navigate('/practice')}>
+            Start Practising →
+          </Button>
+        </Card>
+      ) : (
+        <div className={styles.list}>
+          {plan.map((item) => (
+            <Card key={item.topic_id} className={styles.item} variant="nohover">
+              <span className={styles.rank}>{item.priority_rank}</span>
+              <div className={styles.content}>
+                <h2 className={styles.topicName}>{item.topic_name}</h2>
+
+                {/* AI-generated priority reason */}
+                {item.reason && (
+                  <p style={{
+                    fontSize: 'var(--text-sm)',
+                    color: 'var(--text-muted)',
+                    marginBottom: 'var(--space-3)',
+                    lineHeight: 1.5,
+                  }}>
+                    {item.reason}
+                  </p>
+                )}
+
+                {/* Average score chip */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
+                  <span style={{
+                    fontSize: 'var(--text-xs)',
+                    color: item.avg_score >= 75 ? 'var(--color-success)' : item.avg_score >= 55 ? 'var(--color-warning)' : 'var(--color-error)',
+                    fontWeight: 600,
+                  }}>
+                    Current avg: {item.avg_score}%
+                  </span>
+                </div>
+
+                {/* Recommended resources */}
+                {item.recommended_resources && item.recommended_resources.length > 0 && (
+                  <div className={styles.resourceList}>
+                    {item.recommended_resources.map((r, idx) => (
+                      <div key={idx} className={styles.resourceItem}>
+                        {r.startsWith('http') ? (
+                          <a
+                            href={r}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={styles.resourceLink}
+                          >
+                            🔗 {r}
+                          </a>
+                        ) : (
+                          <span>📖 {r}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

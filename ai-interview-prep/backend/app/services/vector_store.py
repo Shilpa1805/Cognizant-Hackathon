@@ -2,11 +2,7 @@ import random
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-try:
-    import chromadb
-except ImportError:
-    chromadb = None
-
+import chromadb
 
 from app.schemas import Question
 
@@ -84,15 +80,11 @@ DIFFICULTY_FALLBACK: dict[str, list[str]] = {
 
 class VectorStoreService:
     def __init__(self, db_path: Path = CHROMA_DB_PATH):
-        if chromadb is not None:
-            self.client = chromadb.PersistentClient(path=str(db_path))
-            self.collection = self.client.get_or_create_collection(
-                name="question_bank",
-                metadata={"hnsw:space": "cosine"}
-            )
-        else:
-            self.client = None
-            self.collection = None
+        self.client = chromadb.PersistentClient(path=str(db_path))
+        self.collection = self.client.get_or_create_collection(
+            name="question_bank",
+            metadata={"hnsw:space": "cosine"}
+        )
 
     # ── Internal fetch helper ────────────────────────────────────────────────
     def _fetch(
@@ -106,9 +98,6 @@ class VectorStoreService:
         Builds a ChromaDB where-filter from any combination of fields and
         returns up to n Question objects. Returns [] on no match or error.
         """
-        if self.collection is None:
-            return []
-
         conditions = []
         if role:
             conditions.append({"role": role})
@@ -271,6 +260,84 @@ def get_question(role: str, topic: Optional[str] = None) -> Question:
     return vector_store.get_question(role, topic)
 
 
-def ingest_questions(questions: list) -> None:
-    """Ingest seed questions into vector store (stub)."""
-    pass
+def ingest_questions(questions: list[dict]) -> None:
+    """
+    Ingests a list of question dicts into the ChromaDB vector store.
+
+    Each dict must contain:
+        question_id   (str UUID)
+        question_text (str)
+        role_id       (str UUID) — used as metadata "role"
+        topic_id      (str UUID) — used as metadata "topic"
+        difficulty    (str)
+        reference_answer (str, optional)
+        source        (str, optional)
+
+    Skips questions already present (upsert-safe via ChromaDB add).
+    """
+    if not questions:
+        return
+
+    # Map role_id / topic_id → human-readable labels using a best-effort lookup.
+    # The ChromaDB where-filter queries use role_name/topic_name strings,
+    # so we store the display names (not UUIDs) in metadata.
+    ROLE_ID_TO_NAME: dict[str, str] = {
+        "00000000-0000-0000-0000-000000000001": "Backend Engineer",
+        "00000000-0000-0000-0000-000000000002": "Frontend Engineer",
+        "00000000-0000-0000-0000-000000000003": "DevOps Engineer",
+        "00000000-0000-0000-0000-000000000004": "Software Engineer",
+    }
+    TOPIC_ID_TO_NAME: dict[str, str] = {
+        "00000000-0000-0000-0000-000000000001": "Python / Data Structures",
+        "00000000-0000-0000-0000-000000000002": "Operating Systems",
+        "00000000-0000-0000-0000-000000000003": "System Design",
+        "00000000-0000-0000-0000-000000000004": "Databases",
+        "00000000-0000-0000-0000-000000000005": "Algorithms",
+        "00000000-0000-0000-0000-000000000006": "Behavioural & Communication",
+        "11111111-1111-1111-1111-111111111111": "Python / Data Structures",
+        "22222222-2222-2222-2222-222222222222": "Operating Systems",
+        "33333333-3333-3333-3333-333333333333": "System Design",
+        "44444444-4444-4444-4444-444444444444": "Databases",
+        "55555555-5555-5555-5555-555555555555": "Algorithms",
+        "66666666-6666-6666-6666-666666666666": "Behavioural & Communication",
+    }
+
+    ids: list[str] = []
+    documents: list[str] = []
+    metadatas: list[dict] = []
+
+    for q in questions:
+        q_id = q.get("question_id", "")
+        text = q.get("question_text", "").strip()
+        if not q_id or not text:
+            continue
+
+        role_raw = q.get("role_id", "")
+        topic_raw = q.get("topic_id", "")
+
+        role_name = ROLE_ID_TO_NAME.get(role_raw, role_raw)
+        topic_name = TOPIC_ID_TO_NAME.get(topic_raw, topic_raw)
+
+        ids.append(q_id)
+        documents.append(text)
+        metadatas.append({
+            "role":             role_name,
+            "topic":            topic_name,
+            "difficulty":       q.get("difficulty", "Medium"),
+            "reference_answer": q.get("reference_answer", ""),
+            "source":           q.get("source", "seed"),
+        })
+
+    if not ids:
+        return
+
+    try:
+        # upsert — safe to call multiple times (idempotent)
+        vector_store.collection.upsert(
+            ids=ids,
+            documents=documents,
+            metadatas=metadatas,
+        )
+        print(f"[vector_store] Ingested {len(ids)} questions into ChromaDB.")
+    except Exception as exc:
+        print(f"[vector_store] ChromaDB upsert failed: {exc}")

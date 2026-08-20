@@ -1,0 +1,198 @@
+/* Onboarding.module.css */
+
+.page {
+  min-height: 100vh;
+  background-color: var(--bg-dark);
+  background-image: radial-gradient(circle at 50% 50%, rgba(160, 104, 255, 0.08) 0%, transparent 70%);
+  display: flex;
+  flex-direction: column;
+}
+
+.main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(var(--nav-h) + var(--space-8)) var(--space-8) var(--space-8);
+}
+
+.container {
+  width: 100%;
+  max-width: 580px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-xl);
+  padding: var(--space-8);
+  backdrop-filter: blur(16px);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-8);
+  gap: var(--space-4);
+}
+
+.title {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.stepInfo {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.progressRingWrap {
+  flex-shrink: 0;
+}
+
+.content {
+  margin-bottom: var(--space-8);
+  min-height: 240px;
+}
+
+.questionText {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: var(--space-6);
+}
+
+/* Grid layout for selectable options */
+.optionsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.optionCard {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease-out-expo);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  user-select: none;
+}
+
+.optionCard:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-bright);
+  transform: translateY(-2px);
+}
+
+.optionCardActive {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.optionIcon {
+  font-size: var(--text-2xl);
+}
+
+.optionLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.optionSub {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Multi-select check box/indicator */
+.checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--border-bright);
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur-fast);
+}
+
+.checkboxActive {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* Grid for companies multi-select tag input */
+.inputField {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-md);
+  color: var(--text-light);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: all var(--dur-fast);
+  margin-bottom: var(--space-4);
+}
+
+.inputField:focus {
+  border-color: var(--accent);
+  background: rgba(160, 104, 255, 0.06);
+}
+
+.tagContainer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.tag {
+  background: var(--accent-dim);
+  border: 1px solid rgba(160, 104, 255, 0.3);
+  color: var(--accent);
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.tagRemove {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tagRemove:hover {
+  color: var(--text-light);
+}
+
+/* Navigation controls */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border-dim);
+  padding-top: var(--space-6);
+}
+
+@media (max-width: 480px) {
+  .optionsGrid {
+    grid-template-columns: 1fr;
+  }
+  .container {
+    padding: var(--space-6);
+  }
+}

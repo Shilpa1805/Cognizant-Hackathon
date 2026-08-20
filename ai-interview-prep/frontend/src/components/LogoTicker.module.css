@@ -1,0 +1,83 @@
+/* LogoTicker.module.css */
+
+.section {
+  padding: var(--space-6) 0;
+}
+
+.caption {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-subtle);
+  margin-bottom: var(--space-6);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Fade masks on edges */
+.wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.wrapper::before,
+.wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 120px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.wrapper::before {
+  left: 0;
+  background: linear-gradient(to right, var(--bg-dark), transparent);
+}
+
+.wrapper::after {
+  right: 0;
+  background: linear-gradient(to left, var(--bg-dark), transparent);
+}
+
+/* Scrolling track — two copies for seamless loop */
+.track {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: max-content;
+  animation: tickerScroll 20s linear infinite;
+}
+
+.track:hover {
+  animation-play-state: paused;
+}
+
+/* Individual logo mark */
+.mark {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  white-space: nowrap;
+  transition: border-color var(--dur-fast) var(--ease-out-expo);
+  flex-shrink: 0;
+}
+
+.mark:hover {
+  border-color: var(--border-bright);
+}
+
+.markEmoji {
+  font-size: 20px;
+}
+
+.markName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.01em;
+}

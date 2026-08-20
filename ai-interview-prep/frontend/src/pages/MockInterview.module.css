@@ -1,0 +1,131 @@
+/* MockInterview.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.roomHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-dim);
+  padding-bottom: var(--space-4);
+}
+
+.roomTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+.timer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-dim);
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(160, 104, 255, 0.3);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 1.12fr 1fr;
+  gap: var(--space-8);
+}
+
+@media (max-width: 1024px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.promptCard {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.promptText {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--text-light);
+}
+
+.metadata {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+/* Editor stub */
+.editorWrapper {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #0d0a21;
+}
+
+.editorHeader {
+  background: #14112c;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-dim);
+}
+
+.editorTab {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.editorDots {
+  display: flex;
+  gap: 6px;
+}
+
+.editorDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 320px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #a9b2c3;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: var(--text-sm);
+  padding: var(--space-4);
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-4);
+  align-items: center;
+}

@@ -1,0 +1,249 @@
+/* Dashboard.module.css */
+
+.container {
+  max-width: var(--content-max-w);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-8) var(--space-16);
+  animation: fadeUp var(--enter-content) var(--ease-out-expo) both;
+}
+
+.welcomeSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-10);
+  gap: var(--space-4);
+}
+
+.welcomeText h1 {
+  font-family: var(--font-heading);
+  font-size: var(--text-4xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.02em;
+}
+
+.welcomeText p {
+  font-size: var(--text-base);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+
+.topActions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+/* Stats dashboard grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+  margin-bottom: var(--space-10);
+}
+
+/* Left main panel taking 2 columns */
+.mainCol {
+  grid-column: span 2;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+/* Right sidebar taking 1 column */
+.sideCol {
+  grid-column: span 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.sectionTitle {
+  font-family: var(--font-heading);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--text-light);
+  letter-spacing: -0.01em;
+}
+
+/* Overview card with overall score ring */
+.overviewCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-6);
+}
+
+.overviewText {
+  flex: 1;
+}
+
+.overviewTitle {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: var(--space-2);
+}
+
+.overviewDesc {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Topic list cards */
+.topicsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
+.topicCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.topicInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.topicName {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.topicMeta {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin-top: 2px;
+}
+
+.progressContainer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.progressBarBg {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.progressBarFill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 1s var(--ease-out-expo);
+}
+
+.progressLabel {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+  width: 36px;
+  text-align: right;
+}
+
+/* Priority list */
+.priorityList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.priorityItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+}
+
+.priorityNum {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--accent);
+  width: 24px;
+}
+
+.priorityName {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+  flex: 1;
+}
+
+.priorityReason {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+}
+
+/* Upcoming/Recent mock list */
+.mockList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mockItem {
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-dim);
+  border-radius: var(--radius-lg);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mockTitle {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-light);
+}
+
+.mockDate {
+  font-size: var(--text-xs);
+  color: var(--text-subtle);
+  margin-top: 2px;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .mainCol, .sideCol {
+    grid-column: span 1;
+  }
+  .topicsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .welcomeSection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .topActions {
+    width: 100%;
+  }
+  .topActions > * {
+    flex: 1;
+  }
+}
