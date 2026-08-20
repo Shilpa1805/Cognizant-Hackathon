@@ -146,7 +146,7 @@ class VectorStoreService:
             )
         return questions
 
-    # ── Smart grounding (cascade fallback) ──────────────────────────────────
+    # ── Smart grounding (topic-centric cascade) ─────────────────────────────
     def get_smart_grounding(
         self,
         role: str,
@@ -155,67 +155,39 @@ class VectorStoreService:
         n_results: int = 3,
     ) -> Tuple[List[Question], str]:
         """
-        Returns (examples, adaptation_notes).
+        Returns (examples, adaptation_notes) using a 3-step topic-centric cascade.
 
-        Cascade strategy:
-          1. mapped_role + topic + difficulty  → perfect match
-          2. mapped_role + difficulty          → topic missing, note it
-          3. mapped_role + topic + adj_diff    → difficulty missing, note it
-          4. mapped_role only                  → both missing, note both
-          5. empty list + full instruction     → nothing at all
+        Step 1 — topic + difficulty (exact match)
+                  → found: use as-is, no adaptation notes needed.
+
+        Step 2 — topic only (any difficulty)
+                  → found: tell Gemini the examples are the right topic but
+                    wrong difficulty, and to adjust to the requested level.
+
+        Step 3 — nothing found for this topic at all
+                  → return empty examples + instruct Gemini to generate
+                    entirely from scratch.
         """
-        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
-        notes: list[str] = []
-
-        if mapped_role != role:
-            notes.append(
-                f"The requested role '{role}' is not in the question bank; "
-                f"using '{mapped_role}' examples as the closest match. "
-                f"Generate the question specifically for a {role}."
-            )
-
-        # 1. Exact match
-        examples = self._fetch(role=mapped_role, topic=topic, difficulty=difficulty, n=n_results)
+        # Step 1: Exact match — topic + difficulty
+        examples = self._fetch(topic=topic, difficulty=difficulty, n=n_results)
         if examples:
-            return examples, "\n".join(notes)
+            return examples, ""
 
-        # 2. Drop topic — keep difficulty
-        examples = self._fetch(role=mapped_role, difficulty=difficulty, n=n_results)
+        # Step 2: Topic found, but wrong difficulty
+        examples = self._fetch(topic=topic, n=n_results)
         if examples:
-            notes.append(
-                f"Topic '{topic}' is not in the question bank; "
-                f"using {mapped_role} examples from other topics as style anchors. "
-                f"Generate a question specifically about '{topic}'."
+            notes = (
+                f"The examples below are for the topic '{topic}' but at a different difficulty level. "
+                f"Use them only as style and content anchors. "
+                f"Generate the question at '{difficulty}' difficulty."
             )
-            return examples, "\n".join(notes)
+            return examples, notes
 
-        # 3. Drop difficulty — keep topic, try adjacent difficulties
-        for adj_diff in DIFFICULTY_FALLBACK.get(difficulty, [difficulty]):
-            examples = self._fetch(role=mapped_role, topic=topic, difficulty=adj_diff, n=n_results)
-            if examples:
-                notes.append(
-                    f"Difficulty '{difficulty}' is not available for this topic; "
-                    f"examples shown are '{adj_diff}'. "
-                    f"Adjust the generated question and answer to '{difficulty}' level."
-                )
-                return examples, "\n".join(notes)
-
-        # 4. Role only — drop both topic and difficulty
-        examples = self._fetch(role=mapped_role, n=n_results)
-        if examples:
-            notes.append(
-                f"Neither topic '{topic}' nor difficulty '{difficulty}' are available "
-                f"for '{mapped_role}' in the question bank. "
-                f"Use these examples only as a style/depth reference. "
-                f"Generate a '{difficulty}' question about '{topic}'."
-            )
-            return examples, "\n".join(notes)
-
-        # 5. Nothing found at all
+        # Step 3: Topic not found at all — generate from scratch
         return [], (
-            f"No examples found in ChromaDB for '{mapped_role}'. "
-            f"Generate a '{difficulty}' {role} interview question about '{topic}' "
-            f"from scratch, without grounding examples."
+            f"No examples found in the question bank for topic '{topic}'. "
+            f"Generate a brand-new '{difficulty}' interview question about '{topic}' "
+            f"for a {role} from scratch, without any grounding examples."
         )
 
     # ── Legacy methods (kept for backward compatibility) ─────────────────────
@@ -243,25 +215,48 @@ class VectorStoreService:
     def get_random_questions(
         self, role: str, topic: Optional[str] = None, count: int = 1,
         excluded_ids: Optional[set] = None,
+        difficulty: Optional[str] = None,
     ) -> List[Question]:
         """
-        Retrieves random questions from ChromaDB filtered by role and topic.
-        Respects ROLE_MAP so any job title works.
-        Filters out any question IDs in excluded_ids to prevent repeats.
+        Retrieves `count` random questions from ChromaDB using a 3-step
+        topic-centric cascade that mirrors get_smart_grounding:
+
+          1. topic + difficulty  → exact match
+          2. topic only          → any difficulty (Gemini adjusts to requested level)
+          3. topic not found     → return empty; Gemini generates from scratch
         """
-        mapped_role = ROLE_MAP.get(role.strip().lower(), DEFAULT_GROUP)
-        results_pool = self._fetch(role=mapped_role, topic=topic, n=50)
-        if not results_pool and topic:
-            results_pool = self._fetch(role=mapped_role, n=50)
-        if not results_pool:
-            return []
+        n_fetch = max(50, count * 3)
+        excluded = excluded_ids or set()
 
-        # Filter excluded IDs
-        if excluded_ids:
-            results_pool = [q for q in results_pool if str(q.id) not in excluded_ids]
+        pool: List[Question] = []
+        seen_ids: set = set()
 
-        random.shuffle(results_pool)
-        return results_pool[:count]
+        def _add(candidates: List[Question]) -> None:
+            for q in candidates:
+                qid = str(q.id)
+                if qid not in excluded and qid not in seen_ids:
+                    pool.append(q)
+                    seen_ids.add(qid)
+
+        # Step 1: Exact match — topic + difficulty
+        if topic and difficulty:
+            _add(self._fetch(topic=topic, difficulty=difficulty, n=n_fetch))
+
+        if len(pool) >= count:
+            random.shuffle(pool)
+            return pool[:count]
+
+        # Step 2: Topic found, any difficulty
+        if topic:
+            _add(self._fetch(topic=topic, n=n_fetch))
+
+        if len(pool) >= count:
+            random.shuffle(pool)
+            return pool[:count]
+
+        # Step 3: Topic not in bank — return empty; Gemini will generate from scratch
+        random.shuffle(pool)
+        return pool[:count]
 
 
 # ---------------------------------------------------------------------------

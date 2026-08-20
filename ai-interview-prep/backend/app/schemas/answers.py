@@ -16,6 +16,8 @@ class AnswerCreate(BaseModel):
     answer_text: str
     question_text: Optional[str] = None       # needed by scoring pipeline
     reference_answer: Optional[str] = None    # gold answer for comparison
+    topic_text: Optional[str] = None          # topic name for correct DB mapping
+    difficulty: Optional[str] = None          # difficulty level for DB storage
 
 
 class AnswerOut(BaseModel):

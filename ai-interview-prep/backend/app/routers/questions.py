@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.questions import QuestionOut
 from app.services.vector_store import vector_store
-from app.services.question_generation import generate_question, GenerationError
+from app.services.question_generation import generate_question, generate_questions_batch, GenerationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -31,7 +31,18 @@ def _to_uuid(raw_id: str) -> uuid.UUID:
         return uuid.uuid5(uuid.NAMESPACE_DNS, str(raw_id))
 
 
-@router.get("/next", response_model=QuestionOut)
+@router.get("/topics", response_model=List[str])
+def get_topics() -> List[str]:
+    """
+    Returns all distinct topic names currently stored in ChromaDB.
+    Used by the frontend to populate topic dropdowns dynamically.
+    """
+    all_questions = vector_store._fetch(n=2000)  # fetch large pool
+    topics = sorted(set(q.topic for q in all_questions if q.topic))
+    return topics
+
+
+
 def next_question(
     role: Optional[str] = Query(None, description="Filter by role, e.g. 'Backend Engineer'"),
     topic: Optional[str] = Query(None, description="Filter by topic, e.g. 'Python / Data Structures'"),
@@ -99,6 +110,7 @@ def next_question(
     bank = vector_store.get_random_questions(
         role=role_filter,
         topic=topic_filter,
+        difficulty=difficulty_filter,
         count=5,  # fetch more to allow filtering excluded
         excluded_ids=excluded,
     )
@@ -125,78 +137,52 @@ def get_questions(
     role: Optional[str] = Query(None, description="Filter by role name, e.g. 'Backend Engineer'"),
     topic: Optional[str] = Query(None, description="Filter by topic name, e.g. 'Python / Data Structures'"),
     difficulty: Optional[str] = Query(None, description="Preferred difficulty: Easy, Medium, Hard"),
-    count: int = Query(5, ge=1, le=10, description="Number of questions to retrieve (5-10)"),
+    count: int = Query(5, ge=1, le=10, description="Number of questions to retrieve (1-10)"),
     excluded_ids: Optional[str] = Query(None, description="JSON array of question IDs to exclude"),
 ) -> List[QuestionOut]:
     """
-    Returns a batch of `count` questions (default 3) for the given role and topic.
+    Returns a batch of `count` AI-generated questions for the given role, topic and difficulty.
 
     **How it works:**
 
-    - **Slot 1** — Gemini generates a fresh question grounded on ChromaDB examples
-      (same ChromaDB-first pipeline as `GET /questions/next`).
-    - **Slots 2–N** — filled with random questions pulled directly from ChromaDB.
-
-    Use this endpoint to pre-load a set of questions at the start of a session.
-    Use `GET /questions/next` to fetch one question at a time during an active session.
+    1. ChromaDB cascade fetches up to 10 reference questions for the topic:
+       - topic + difficulty (exact) → use as grounding
+       - topic only (any difficulty) → use as style anchor, Gemini adjusts difficulty
+       - topic not in DB → Gemini generates fully from scratch
+    2. All reference examples are sent to Gemini in a single prompt asking it
+       to generate exactly `count` new, distinct questions inspired by them.
+    3. Gemini returns a JSON array of `count` questions which are returned directly.
     """
     role_filter = role or "Backend Engineer"
     topic_filter = topic or "Python / Data Structures"
     difficulty_filter = difficulty or "Medium"
-    excluded = set(json.loads(excluded_ids) if excluded_ids else [])
 
-    questions_out: List[QuestionOut] = []
-
-    # 1. Attempt fresh Gemini generation for the leading question
     try:
-        ai_q = generate_question(role=role_filter, topic=topic_filter, difficulty=difficulty_filter)
-        q_id = _to_uuid(ai_q.id)
-        if str(q_id) not in excluded:
-            questions_out.append(
-                QuestionOut(
-                    question_id=q_id,
-                    topic_id=_DEFAULT_TOPIC_ID,
-                    role_id=_DEFAULT_ROLE_ID,
-                    question_text=ai_q.question_text,
-                    reference_answer=ai_q.reference_answer,
-                    difficulty=ai_q.difficulty.lower() if ai_q.difficulty else difficulty_filter.lower(),
-                    source="gemini",
-                )
+        ai_questions = generate_questions_batch(
+            role=role_filter,
+            topic=topic_filter,
+            difficulty=difficulty_filter,
+            count=count,
+        )
+        return [
+            QuestionOut(
+                question_id=_to_uuid(q.id),
+                topic_id=_DEFAULT_TOPIC_ID,
+                role_id=_DEFAULT_ROLE_ID,
+                question_text=q.question_text,
+                reference_answer=q.reference_answer,
+                difficulty=q.difficulty.lower() if q.difficulty else difficulty_filter.lower(),
+                source="gemini",
             )
+            for q in ai_questions
+        ]
     except (GenerationError, Exception) as exc:
-        logger.warning(
-            "Gemini leading question generation failed (%s: %s). Falling back to ChromaDB bank.",
+        logger.error(
+            "Batch question generation failed (%s: %s). Returning empty list.",
             type(exc).__name__, exc,
             exc_info=True,
         )
-
-    # 2. Retrieve remaining questions from ChromaDB Question Bank
-    needed = count - len(questions_out)
-    if needed > 0:
-        already_added = {str(q.question_id) for q in questions_out} | excluded
-        bank_questions = vector_store.get_random_questions(
-            role=role_filter,
-            topic=topic_filter,
-            count=needed + 10,  # over-fetch to compensate for filtered-out duplicates
-            excluded_ids=already_added,
+        raise HTTPException(
+            status_code=503,
+            detail="Question generation is temporarily unavailable. Please check your GEMINI_API_KEY and try again.",
         )
-
-        for bq in bank_questions:
-            if len(questions_out) >= count:
-                break
-            bq_id = _to_uuid(bq.id)
-            if str(bq_id) not in already_added:
-                questions_out.append(
-                    QuestionOut(
-                        question_id=bq_id,
-                        topic_id=_DEFAULT_TOPIC_ID,
-                        role_id=_DEFAULT_ROLE_ID,
-                        question_text=bq.question_text,
-                        reference_answer=bq.reference_answer,
-                        difficulty=bq.difficulty.lower() if bq.difficulty else difficulty_filter.lower(),
-                        source="chromadb",
-                    )
-                )
-                already_added.add(str(bq_id))
-
-    return questions_out

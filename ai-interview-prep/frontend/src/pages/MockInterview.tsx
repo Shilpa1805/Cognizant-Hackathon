@@ -21,11 +21,8 @@ interface Question {
 const ROLE_OPTIONS = [
   'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
 ]
-const TOPIC_OPTIONS = [
-  'Python / Data Structures', 'System Design', 'Behavioral & Communication',
-  'Databases', 'Operating Systems', 'Algorithms',
-]
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard']
+
 
 const SEEN_IDS_KEY = 'prepiq_seen_question_ids'
 function getSeenIds(): string[] {
@@ -49,6 +46,18 @@ export default function MockInterview() {
   const [customTopic, setCustomTopic] = useState('')
   const [difficulty, setDifficulty] = useState('Medium')
   const [questionCount, setQuestionCount] = useState(5)
+  const [topicOptions, setTopicOptions] = useState<string[]>([
+    'Python / Data Structures', 'System Design', 'Behavioral & Communication',
+    'Databases', 'Operating Systems', 'Algorithms',
+  ])
+
+  // Fetch available topics from ChromaDB on mount
+  useEffect(() => {
+    api.get('/questions/topics')
+      .then(res => { if (res.data?.length) setTopicOptions(res.data) })
+      .catch(() => {}) // silently keep defaults on failure
+  }, [])
+
 
   // Session state
   const [phase, setPhase] = useState<Phase>('config')
@@ -161,6 +170,8 @@ export default function MockInterview() {
             answer_text: answerText,
             question_text: q.question_text,
             reference_answer: q.reference_answer || '',
+            topic_text: effectiveTopic,
+            difficulty: difficulty,
           })
           scores.push({ score: scoreData, question: q, answerText })
         } catch {
@@ -205,7 +216,7 @@ export default function MockInterview() {
             <div>
               <label style={{ display: 'block', fontWeight: 600, fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '6px' }}>Topic</label>
               <select value={topic} onChange={e => setTopic(e.target.value)} className={styles.select}>
-                {TOPIC_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
               <input
                 type="text"

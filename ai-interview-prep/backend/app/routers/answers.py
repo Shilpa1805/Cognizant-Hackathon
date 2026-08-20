@@ -68,20 +68,45 @@ def submit_answer(
             db.add(fallback_session)
             db.flush()
 
-        # 3. Ensure question exists
+        # 3. Ensure question exists — resolve topic by name, not by hardcoded UUID
         q_exists = db.query(Question).filter(Question.question_id == payload.question_id).first()
         if not q_exists:
+            from app.models.role_topic import Topic as TopicModel
+            from sqlalchemy import func as sqlfunc
+
+            # The frontend sends the topic text via question_text context; we use
+            # payload.topic_text if provided, otherwise fall back to the seed default.
+            topic_name: str = (getattr(payload, "topic_text", None) or "").strip() or "General"
+
+            # Look up the topic row by name (case-insensitive)
+            topic_row = (
+                db.query(TopicModel)
+                .filter(sqlfunc.lower(TopicModel.topic_name) == topic_name.lower())
+                .first()
+            )
+
+            # If topic doesn't exist in the SQL table yet, create it on-the-fly
+            if not topic_row:
+                topic_row = TopicModel(
+                    topic_id=uuid.uuid5(uuid.NAMESPACE_DNS, topic_name.lower()),
+                    topic_name=topic_name,
+                    role_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                )
+                db.add(topic_row)
+                db.flush()
+
             new_q = Question(
                 question_id=payload.question_id,
                 role_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
-                topic_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                topic_id=topic_row.topic_id,
                 question_text=payload.question_text or "Dynamic Question",
                 reference_answer=payload.reference_answer or "Dynamic Answer",
-                difficulty="medium",
+                difficulty=getattr(payload, "difficulty", "medium") or "medium",
                 source="dynamic"
             )
             db.add(new_q)
             db.flush()
+
 
         # 4. Save Answer
         answer_row = AnswerModel(

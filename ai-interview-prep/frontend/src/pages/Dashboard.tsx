@@ -8,29 +8,38 @@ import Badge from '../components/Badge'
 import ProgressRing from '../components/ProgressRing'
 import styles from './Dashboard.module.css'
 
-interface TopicSummary {
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+interface TopicAvg {
   topic_id: string
   topic_name: string
-  category: string
   avg_score: number
-  attempts_count: number
   question_frequency: number
-  priority_score: number
+}
+
+interface StudyPlanItem {
+  topic_id: string
+  topic_name: string
   priority_rank: number
+  recommended_focus: string
+  avg_score: number
+  question_frequency: number
+}
+
+interface SessionHistory {
+  session_id: string
+  started_at: string
+  ended_at: string | null
+  overall_session_score: number | null
 }
 
 interface DashboardData {
   user_id: string
-  overall_avg_score: number
-  total_answers: number
-  topic_summaries: TopicSummary[]
-  study_plan: Array<{
-    priority_rank: number
-    topic_id: string
-    topic_name: string
-    avg_score: number
-    reason: string
-  }>
+  topic_average_scores: TopicAvg[]
+  study_plan: StudyPlanItem[]
+  session_history: SessionHistory[]
 }
 
 const TOPIC_COLORS = ['#A068FF', '#4ade80', '#60a5fa', '#fbbf24', '#f87171']
@@ -78,8 +87,13 @@ export default function Dashboard() {
     )
   }
 
-  const overallAvg = data?.overall_avg_score ?? 0
-  const topicProgress = data?.topic_summaries ?? []
+  const validSessions = data?.session_history?.filter(s => s.overall_session_score !== null) || []
+  const overallAvg = validSessions.length > 0
+    ? Math.round(validSessions.reduce((acc, s) => acc + (s.overall_session_score || 0), 0) / validSessions.length)
+    : 0
+  const totalAnswers = data?.topic_average_scores?.reduce((acc, t) => acc + (t.question_frequency || 0), 0) ?? 0
+
+  const topicProgress = data?.topic_average_scores ?? []
   const studyPlan = data?.study_plan ?? []
 
   return (
@@ -121,7 +135,7 @@ export default function Dashboard() {
             <div className={styles.overviewText}>
               <h2 className={styles.overviewTitle}>Overall Preparedness</h2>
               <p className={styles.overviewDesc}>
-                You have completed {data?.total_answers ?? 0} topic answers.
+                You have completed {totalAnswers} topic answers.
                 Your current weighted average score is {overallAvg}%. Keep practicing
                 your lowest-scoring modules to rank up your rating.
               </p>
@@ -145,7 +159,7 @@ export default function Dashboard() {
                       <div>
                         <span className={styles.topicName}>{tp.topic_name}</span>
                         <p className={styles.topicMeta}>
-                          {tp.attempts_count} attempt{tp.attempts_count !== 1 ? 's' : ''}
+                          {tp.question_frequency} attempt{tp.question_frequency !== 1 ? 's' : ''}
                         </p>
                       </div>
                       <Badge variant={tp.avg_score >= 75 ? 'easy' : tp.avg_score >= 55 ? 'medium' : 'hard'}>
@@ -187,7 +201,7 @@ export default function Dashboard() {
                   <span className={styles.priorityNum}>#{item.priority_rank}</span>
                   <div style={{ flex: 1 }}>
                     <span className={styles.priorityName}>{item.topic_name}</span>
-                    <p className={styles.priorityReason}>{item.reason}</p>
+                    <p className={styles.priorityReason}>{item.recommended_focus}</p>
                   </div>
                 </div>
               ))}
@@ -203,23 +217,54 @@ export default function Dashboard() {
             </div>
           </div>
 
-          {/* Recent sessions — guided empty state */}
+          {/* Recent sessions */}
           <div>
             <h2 className={styles.sectionTitle} style={{ marginBottom: 'var(--space-4)' }}>
               Recent Sessions
             </h2>
             <div className={styles.mockList}>
-              <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
-                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
-                  No sessions recorded yet.
-                </p>
-                <a
-                  href="/mock-interview/new"
-                  style={{ color: 'var(--accent)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}
-                >
-                  Start your first mock interview →
-                </a>
-              </div>
+              {(!data?.session_history || data.session_history.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: 'var(--space-6) 0' }}>
+                  <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+                    No sessions recorded yet.
+                  </p>
+                  <Link
+                    to="/mock-interview/new"
+                    style={{ color: 'var(--accent)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}
+                  >
+                    Start your first mock interview →
+                  </Link>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {data.session_history.slice(0, 4).map(session => (
+                    <Card key={session.session_id} variant="nohover" style={{ padding: '12px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <p style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 2px 0' }}>
+                            {formatDate(session.started_at)}
+                          </p>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                            {session.ended_at ? 'Completed' : 'In Progress'}
+                          </span>
+                        </div>
+                        {session.overall_session_score !== null && (
+                          <Badge variant={session.overall_session_score >= 70 ? 'easy' : session.overall_session_score >= 50 ? 'medium' : 'hard'}>
+                            {Math.round(session.overall_session_score)}%
+                          </Badge>
+                        )}
+                      </div>
+                    </Card>
+                  ))}
+                  <Link
+                    to="/history"
+                    className="toggleLink"
+                    style={{ fontSize: '13px', marginTop: 'var(--space-2)', alignSelf: 'center', display: 'block', textAlign: 'center' }}
+                  >
+                    View all history →
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
 

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import api from '../lib/api'
@@ -20,11 +20,8 @@ interface Question {
 const ROLE_OPTIONS = [
   'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
 ]
-const TOPIC_OPTIONS = [
-  'Python / Data Structures', 'System Design', 'Behavioral & Communication',
-  'Databases', 'Operating Systems', 'Algorithms',
-]
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard']
+
 
 const SEEN_IDS_KEY = 'prepiq_seen_question_ids'
 
@@ -49,6 +46,18 @@ export default function Practice() {
   const [customTopic, setCustomTopic] = useState('')
   const [difficulty, setDifficulty] = useState('Medium')
   const [questionCount, setQuestionCount] = useState(5)
+  const [topicOptions, setTopicOptions] = useState<string[]>([
+    'Python / Data Structures', 'System Design', 'Behavioral & Communication',
+    'Databases', 'Operating Systems', 'Algorithms',
+  ])
+
+  // Fetch available topics from ChromaDB on mount
+  useEffect(() => {
+    api.get('/questions/topics')
+      .then(res => { if (res.data?.length) setTopicOptions(res.data) })
+      .catch(() => {}) // silently keep defaults on failure
+  }, [])
+
 
   // Session state
   const [phase, setPhase] = useState<Phase>('config')
@@ -120,6 +129,8 @@ export default function Practice() {
             answer_text: answerText,
             question_text: q.question_text,
             reference_answer: q.reference_answer || '',
+            topic_text: effectiveTopic,
+            difficulty: difficulty,
           })
           scores.push({ score: scoreData, question: q, answerText })
         } catch {
@@ -155,7 +166,7 @@ export default function Practice() {
             <div className={styles.filterGroup}>
               <label className={styles.filterLabel}>Topic</label>
               <select value={topic} onChange={e => setTopic(e.target.value)} className={styles.select}>
-                {TOPIC_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
               <input
                 type="text"

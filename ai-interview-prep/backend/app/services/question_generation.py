@@ -49,7 +49,7 @@ def _build_prompt(
     adaptation_notes: str,
 ) -> str:
     """
-    Builds a grounded Gemini prompt.
+    Builds a grounded Gemini prompt for generating a single question.
     If adaptation_notes is non-empty, it tells Gemini exactly what adjustments
     to make (e.g. wrong difficulty, topic missing, role was mapped).
     """
@@ -84,6 +84,61 @@ RULES:
 Return valid JSON with exactly these keys:
   "role", "topic", "difficulty", "question_text", "reference_answer"
 """
+
+
+def _build_batch_prompt(
+    role: str,
+    topic: str,
+    difficulty: str,
+    count: int,
+    examples_context: str,
+    adaptation_notes: str,
+) -> str:
+    """
+    Builds a Gemini prompt that requests `count` distinct questions in one shot.
+    Reference examples (from ChromaDB) are included to anchor style, depth and topic.
+    If adaptation_notes is set, Gemini is told how to adjust (e.g. wrong difficulty).
+    """
+    adaptation_block = (
+        f"\nIMPORTANT ADAPTATION INSTRUCTIONS:\n{adaptation_notes}\n"
+        if adaptation_notes.strip()
+        else ""
+    )
+
+    examples_block = (
+        f"Reference Examples from our question bank (use as inspiration for style, depth and topic — do NOT copy them):\n{examples_context}"
+        if examples_context.strip()
+        else "No reference examples are available — generate all questions from scratch."
+    )
+
+    return f"""You are an expert technical interviewer. Your job is to generate exactly {count} high-quality, distinct interview questions.
+
+TARGET PARAMETERS:
+- Role: {role}
+- Topic: {topic}
+- Difficulty: {difficulty}
+- Number of questions to generate: {count}
+{adaptation_block}
+{examples_block}
+
+RULES:
+1. Every question MUST be exactly {difficulty} difficulty — not easier, not harder.
+2. Every question MUST be clearly related to {topic} and relevant for a {role}.
+3. Each reference_answer must be thorough and technically accurate.
+4. Do NOT copy any of the reference examples — all {count} questions must be new and distinct from each other.
+5. Match the style and depth of the reference examples.
+6. Vary the question types (conceptual, applied, debugging, design, etc.) across the {count} questions.
+
+Return a valid JSON array of exactly {count} objects. Each object must have exactly these keys:
+  "role", "topic", "difficulty", "question_text", "reference_answer"
+
+Example format:
+[
+  {{"role": "...", "topic": "...", "difficulty": "...", "question_text": "...", "reference_answer": "..."}},
+  ...
+]
+"""
+
 
 
 def generate_question(role: str, topic: str, difficulty: str = "Medium") -> Question:
@@ -152,6 +207,95 @@ def generate_question(role: str, topic: str, difficulty: str = "Medium") -> Ques
                 continue
 
     raise GenerationError(f"All Gemini models failed. Last error: {last_err}")
+
+
+def generate_questions_batch(
+    role: str,
+    topic: str,
+    difficulty: str = "Medium",
+    count: int = 5,
+) -> list[Question]:
+    """
+    Generates `count` distinct interview questions in a single Gemini call.
+
+    Flow:
+      1. Run the 3-step ChromaDB cascade to find reference examples:
+           - topic + difficulty (exact) → use as-is
+           - topic only (any difficulty) → use with adaptation note
+           - topic not found → generate fully from scratch
+      2. Send ALL found reference examples to Gemini with a batch prompt
+         requesting exactly `count` new, distinct questions.
+      3. Parse the JSON array response and return a list of Question objects.
+      4. On Gemini failure, raise GenerationError.
+    """
+    api_key = settings.GEMINI_API_KEY
+    if not api_key:
+        raise GenerationError("GEMINI_API_KEY environment variable is not set.")
+
+    # 1. ChromaDB cascade — fetch as many reference examples as available
+    grounding_examples, adaptation_notes = vector_store.get_smart_grounding(
+        role=role, topic=topic, difficulty=difficulty,
+        n_results=10,  # grab more examples to give Gemini richer context
+    )
+
+    examples_context = "\n\n".join(
+        f"Reference {i + 1}:\n"
+        f"  Q: {eg.question_text}\n"
+        f"  A: {eg.reference_answer}"
+        for i, eg in enumerate(grounding_examples)
+    )
+
+    # 2. Build the batch prompt
+    prompt = _build_batch_prompt(
+        role, topic, difficulty, count, examples_context, adaptation_notes
+    )
+
+    client = genai.Client(api_key=api_key)
+    last_err = None
+
+    # 3. Try each model; one retry per model on transient errors
+    for model_name in FALLBACK_MODELS:
+        for attempt in range(2):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        temperature=0.8,  # slightly higher for more variety
+                    ),
+                )
+
+                if response.text:
+                    raw_text = re.sub(r"^```json\s*|\s*```$", "", response.text.strip())
+                    data = json.loads(raw_text)
+
+                    # Handle both a plain array and {"questions": [...]} wrapper
+                    if isinstance(data, dict):
+                        data = data.get("questions", list(data.values())[0] if data else [])
+
+                    if not isinstance(data, list):
+                        raise ValueError(f"Expected JSON array, got {type(data)}")
+
+                    return [
+                        Question(
+                            id=str(uuid.uuid4()),
+                            role=item.get("role", role),
+                            topic=item.get("topic", topic),
+                            difficulty=item.get("difficulty", difficulty),
+                            question_text=item["question_text"],
+                            reference_answer=item["reference_answer"],
+                        )
+                        for item in data
+                        if "question_text" in item and "reference_answer" in item
+                    ]
+
+            except Exception as e:
+                last_err = e
+                time.sleep(1.5)
+                continue
+
+    raise GenerationError(f"All Gemini models failed for batch generation. Last error: {last_err}")
 
 
 def generate_followup_question(request: FollowUpRequest) -> Question:

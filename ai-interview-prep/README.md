@@ -118,13 +118,13 @@ JWT_EXPIRE_MINUTES=1440
 CORS_ORIGINS=["http://localhost:5173","http://localhost:3000"]
 
 # Google Gemini API key (required for AI scoring and question generation)
-GOOGLE_API_KEY=your_google_gemini_api_key_here
+GEMINI_API_KEY=your_google_gemini_api_key_here
 
 APP_ENV=development
 ```
 
 > 🔑 **Getting a Google Gemini API key:**
-> Visit [Google AI Studio](https://aistudio.google.com/app/apikey), sign in, and create a free API key. Paste it into `.env` as `GOOGLE_API_KEY`.
+> Visit [Google AI Studio](https://aistudio.google.com/app/apikey), sign in, and create a free API key. Paste it into `.env` as `GEMINI_API_KEY`.
 
 #### 2d. Database Initialization
 
@@ -205,7 +205,7 @@ Navigate to **http://localhost:5173**, click **Sign Up**, complete onboarding, a
 | `JWT_ALGORITHM` | ❌ | `HS256` | JWT signing algorithm |
 | `JWT_EXPIRE_MINUTES` | ❌ | `1440` | Session expiry (24 hours) |
 | `CORS_ORIGINS` | ❌ | `["http://localhost:5173"]` | JSON array of allowed origins |
-| `GOOGLE_API_KEY` | ✅ | — | Google Gemini API key for AI scoring |
+| `GEMINI_API_KEY` | ✅ | — | Google Gemini API key for AI scoring |
 | `APP_ENV` | ❌ | `development` | Environment name |
 
 ### Frontend (`frontend/.env`)
@@ -266,7 +266,7 @@ npm run preview
 | **Runtime** | Python 3.11 (see `backend/runtime.txt`) |
 | **Build Command** | `pip install -r requirements.txt && python -m spacy download en_core_web_sm` |
 | **Start Command** | `uvicorn app.main:app --host 0.0.0.0 --port $PORT` |
-| **Environment Variables** | Set `DATABASE_URL`, `JWT_SECRET`, `GOOGLE_API_KEY`, `CORS_ORIGINS` in service settings |
+| **Environment Variables** | Set `DATABASE_URL`, `JWT_SECRET`, `GEMINI_API_KEY`, `CORS_ORIGINS` in service settings |
 
 ### Frontend (Vercel / Netlify)
 
@@ -348,7 +348,7 @@ For offline ML experimentation, see [`ml/README.md`](ml/README.md).
 **Frontend shows "Network Error" / cannot reach API**
 → Ensure the backend is running on port 8000. Check `frontend/vite.config.ts` for the proxy config.
 
-**`GOOGLE_API_KEY` errors / AI scoring returns 0**
+**`GEMINI_API_KEY` errors / AI scoring returns 0**
 → Add a valid Gemini API key to `backend/.env`. Without it, the LLM judge score will fall back to 0 but the app still functions.
 
 **Port 8000 already in use**
