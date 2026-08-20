@@ -20,6 +20,7 @@ from app.services.scoring import score_answer
 from app.models.answer import Answer as AnswerModel
 from app.models.score import Score as ScoreModel
 from app.models.session import MockSession
+from app.models.question import Question
 
 router = APIRouter()
 
@@ -47,6 +48,21 @@ def submit_answer(
     # --- Persist Answer to DB (best-effort, non-blocking) ---
     effective_session_id = session_id or uuid.UUID("00000000-0000-0000-0000-000000000001")
     try:
+        # Ensure the dynamically generated question exists in SQLite to satisfy the FK constraint
+        q_exists = db.query(Question).filter(Question.question_id == payload.question_id).first()
+        if not q_exists:
+            new_q = Question(
+                question_id=payload.question_id,
+                role_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                topic_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
+                question_text=payload.question_text or "Dynamic Question",
+                reference_answer=payload.reference_answer or "Dynamic Answer",
+                difficulty="medium",
+                source="dynamic"
+            )
+            db.add(new_q)
+            db.flush()
+
         answer_row = AnswerModel(
             answer_id=answer_id,
             session_id=effective_session_id,
@@ -86,9 +102,11 @@ def submit_answer(
 
         db.commit()
     except Exception as exc:
+        db.rollback()
         import logging
         logging.getLogger(__name__).warning("Failed to persist answer/score: %s", exc)
-        db.rollback()
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(exc))
 
     return ScoreOut(
         score_id=uuid.uuid4(),
