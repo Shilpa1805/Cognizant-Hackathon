@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+
 import { LineChart, Line, ResponsiveContainer, YAxis } from 'recharts'
 import { useAuth } from '../hooks/useAuth'
 import Button from '../components/Button'
@@ -43,7 +43,7 @@ function timeAgo(dateString: string | null) {
 
 export default function PriorityPlan() {
   const { user } = useAuth()
-  const navigate = useNavigate()
+
   
   const [topics, setTopics] = useState<TopicAvg[]>([])
   const [loading, setLoading] = useState(true)

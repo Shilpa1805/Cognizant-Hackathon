@@ -160,7 +160,7 @@ export default function Dashboard() {
             </div>
             {topicScores.length > 0 ? (
               <div className={styles.topicsGrid}>
-                {topicScores.map((tp, idx) => {
+                {topicScores.slice(0, 6).map((tp, idx) => {
                   const color = TOPIC_COLORS[idx % TOPIC_COLORS.length]
                   return (
                     <Card key={tp.topic_id} className={styles.topicCard}>
@@ -245,11 +245,11 @@ export default function Dashboard() {
             <div className={styles.mockList}>
               {sessionHistory.length > 0 ? (
                 <>
-                  {sessionHistory.slice(0, 4).map((s) => (
+                  {sessionHistory.slice(0, 2).map((s) => (
                     <div key={s.session_id} className={styles.mockItem}>
                       <div>
                         <span className={styles.mockTitle}>
-                          {new Date(s.started_at).toLocaleDateString(undefined, {
+                          {new Date(s.started_at.endsWith('Z') ? s.started_at : s.started_at + 'Z').toLocaleDateString(undefined, {
                             month: 'short',
                             day: 'numeric',
                             hour: '2-digit',

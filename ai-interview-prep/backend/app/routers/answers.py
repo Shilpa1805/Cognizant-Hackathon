@@ -21,6 +21,7 @@ from app.services.scoring import score_answer
 from app.models.answer import Answer as AnswerModel
 from app.models.score import Score as ScoreModel
 from app.models.session import MockSession
+from app.models.question import Question
 from app.models.user import User as UserModel
 from app.dependencies.auth import verify_clerk_token
 

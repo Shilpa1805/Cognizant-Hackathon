@@ -132,14 +132,21 @@
 
 .select {
   width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border: 1px solid var(--border-dim);
   border-radius: 8px;
-  background: var(--surface);
-  color: var(--text-primary);
+  background-color: #1a153a; /* Explicit dark background */
+  color: #e2e8f0;
   font-size: 14px;
   outline: none;
   cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.select option {
+  background-color: #130f26; /* Dark background for dropdown options */
+  color: #e2e8f0;
+  padding: 8px;
 }
 
 .select:focus {

@@ -75,18 +75,28 @@ export default function Analytics() {
   }, [scoredSessions])
 
   // Score over time for line chart
-  const scoreTimeline = useMemo(() =>
-    scoredSessions
-      .slice()
-      .sort((a, b) => new Date(a.started_at).getTime() - new Date(b.started_at).getTime())
-      .map((s, i) => ({
-        label: `S${i + 1}`,
-        date: new Date(s.started_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
-        score: Math.round(s.avg_score ?? 0),
-        type: s.session_type,
-      })),
-    [scoredSessions]
-  )
+  const scoreTimeline = useMemo(() => {
+    // Group scores by exact calendar day
+    const grouped = scoredSessions.reduce((acc, s) => {
+      const zuluIso = s.started_at.endsWith('Z') ? s.started_at : s.started_at + 'Z';
+      const dateKey = new Date(zuluIso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      
+      if (!acc[dateKey]) {
+        acc[dateKey] = { totalScore: 0, count: 0, rawDate: new Date(zuluIso).getTime() };
+      }
+      acc[dateKey].totalScore += (s.avg_score ?? 0);
+      acc[dateKey].count += 1;
+      return acc;
+    }, {} as Record<string, { totalScore: number; count: number; rawDate: number }>);
+
+    // Convert to array, sort chronologically, and map to Recharts format
+    return Object.entries(grouped)
+      .sort(([, a], [, b]) => a.rawDate - b.rawDate)
+      .map(([dateStr, data]) => ({
+        date: dateStr,
+        score: Math.round(data.totalScore / data.count),
+      }));
+  }, [scoredSessions]);
 
   // Topics from dashboard — split into strengths and weaknesses
   const topicSummaries = dashData?.topic_average_scores ?? []

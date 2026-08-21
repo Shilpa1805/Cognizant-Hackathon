@@ -17,9 +17,7 @@ interface Question {
   source?: string
 }
 
-const ROLE_OPTIONS = [
-  'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
-]
+
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard']
 
 
@@ -43,7 +41,7 @@ export default function Practice() {
   // Config state – pre-fill from onboarding
   const [role, setRole] = useState(onboardingData?.targetRole || 'Backend Engineer')
   const [topic, setTopic] = useState('Python / Data Structures')
-  const [customTopic, setCustomTopic] = useState('')
+
   const [difficulty, setDifficulty] = useState('Medium')
   const [questionCount, setQuestionCount] = useState(5)
   const [topicOptions, setTopicOptions] = useState<string[]>([
@@ -69,7 +67,7 @@ export default function Practice() {
   const [error, setError] = useState<string | null>(null)
 
   const userId = user?.user_id
-  const effectiveTopic = customTopic.trim() || topic
+  const effectiveTopic = topic
   const ACTIVE_PRACTICE_KEY = 'prepiq_active_practice_session'
 
   // Restore active practice session on mount if one was saved and is still active in DB
@@ -203,14 +201,7 @@ export default function Practice() {
     }
   }
 
-  const handleAbandon = () => {
-    localStorage.removeItem(ACTIVE_PRACTICE_KEY)
-    setPhase('config')
-    setSessionId(null)
-    setQuestions([])
-    setAnswers({})
-    setCurrentIdx(0)
-  }
+
 
   const question = questions[currentIdx]
   const allAnswered = questions.length > 0 && questions.every((_, i) => answers[i]?.trim())
@@ -234,14 +225,6 @@ export default function Practice() {
               <select value={topic} onChange={e => setTopic(e.target.value)} className={styles.select}>
                 {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <input
-                type="text"
-                value={customTopic}
-                onChange={e => setCustomTopic(e.target.value)}
-                placeholder="Or enter your own topic…"
-                className={styles.select}
-                style={{ marginTop: '8px' }}
-              />
             </div>
 
             {/* Difficulty */}

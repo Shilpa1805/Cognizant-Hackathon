@@ -18,9 +18,7 @@ interface Question {
   reference_answer?: string
 }
 
-const ROLE_OPTIONS = [
-  'Backend Engineer', 'Frontend Engineer', 'Software Engineer', 'ML Engineer',
-]
+
 const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard']
 
 
@@ -43,7 +41,7 @@ export default function MockInterview() {
   // Config state
   const [role, setRole] = useState(onboardingData?.targetRole || 'Backend Engineer')
   const [topic, setTopic] = useState('System Design')
-  const [customTopic, setCustomTopic] = useState('')
+
   const [difficulty, setDifficulty] = useState('Medium')
   const [questionCount, setQuestionCount] = useState(5)
   const [topicOptions, setTopicOptions] = useState<string[]>([
@@ -72,7 +70,7 @@ export default function MockInterview() {
 
   const autoAdvanceRef = useRef(false)  // prevent double-trigger
   const userId = user?.user_id;
-  const effectiveTopic = customTopic.trim() || topic
+  const effectiveTopic = topic
   const ACTIVE_MOCK_KEY = 'prepiq_active_mock_session'
 
   // Restore active mock session on mount if one was saved and is still active in DB
@@ -246,15 +244,7 @@ export default function MockInterview() {
     }
   }
 
-  const handleAbandon = () => {
-    localStorage.removeItem(ACTIVE_MOCK_KEY)
-    setPhase('config')
-    setSessionId(null)
-    setQuestions([])
-    setAnswers({})
-    setCurrentIdx(0)
-    setLocked(new Set())
-  }
+
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60)
@@ -287,14 +277,6 @@ export default function MockInterview() {
               <select value={topic} onChange={e => setTopic(e.target.value)} className={styles.select}>
                 {topicOptions.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
-              <input
-                type="text"
-                value={customTopic}
-                onChange={e => setCustomTopic(e.target.value)}
-                placeholder="Or enter your own topic…"
-                className={styles.select}
-                style={{ marginTop: '8px' }}
-              />
             </div>
 
             <div>
@@ -374,7 +356,7 @@ export default function MockInterview() {
             Question {currentIdx + 1} of {questions.length} · {effectiveTopic} · {difficulty}
           </p>
         </div>
-        <div style={{ display: 'flex', align: 'center', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {/* Q progress dots */}
           <div style={{ display: 'flex', gap: '6px' }}>
             {questions.map((_, i) => (
