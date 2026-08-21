@@ -1,4 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import api from '../lib/api'
 import Card from '../components/Card'
 import Button from '../components/Button'
 import Badge from '../components/Badge'
@@ -36,6 +38,40 @@ export default function SessionAnalysis() {
     scores: QuestionResult[]
     sessionType: 'practice' | 'mock'
   }
+
+  // Fetch calibration regression coefficients from the fast cached endpoint.
+  // The server pre-warms this at startup in a background thread, so it's
+  // usually instant. If still warming, we poll every 3s until ready.
+  const [calibSlope, setCalibSlope] = useState<number | null>(null)
+  const [calibIntercept, setCalibIntercept] = useState<number | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout>
+
+    const fetchCoefficients = async () => {
+      try {
+        const res = await api.get('/calibration/coefficients', {
+          timeout: 5_000,
+          // Accept both 200 (ready) and 202 (still warming) — don't throw on 202
+          validateStatus: (s) => s === 200 || s === 202,
+        })
+        if (cancelled) return
+        if (res.data?.ready && res.data.linear_slope != null) {
+          setCalibSlope(res.data.linear_slope)
+          setCalibIntercept(res.data.linear_intercept)
+        } else {
+          // Cache still warming — retry in 3s
+          retryTimer = setTimeout(fetchCoefficients, 3_000)
+        }
+      } catch {
+        if (!cancelled) retryTimer = setTimeout(fetchCoefficients, 5_000)
+      }
+    }
+
+    fetchCoefficients()
+    return () => { cancelled = true; clearTimeout(retryTimer) }
+  }, [])
 
   if (!scores || scores.length === 0) {
     return (
@@ -90,8 +126,8 @@ export default function SessionAnalysis() {
             {overallPct >= 75
               ? '🎉 Excellent work! You demonstrated strong understanding across the session.'
               : overallPct >= 50
-              ? '👍 Good effort! Review the feedback below to improve further.'
-              : '💪 Keep practicing! Focus on the missing keywords and tips provided below.'}
+                ? '👍 Good effort! Review the feedback below to improve further.'
+                : '💪 Keep practicing! Focus on the missing keywords and tips provided below.'}
           </p>
           <div style={{ display: 'flex', gap: '16px', marginTop: '12px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
@@ -153,6 +189,61 @@ export default function SessionAnalysis() {
                   </div>
                   <span className={styles.simVal}>{simPct}%</span>
                 </div>
+
+                {/* Human sanity-check score bar — predicted from calibration regression */}
+                {score?.fused_score != null && (() => {
+                  // Predicted human score: slope * fused_score (forced through origin: if fused_score is 0, human score is 0)
+                  const hasPrediction = calibSlope != null && calibIntercept != null
+                  const rawFused = score.fused_score ?? 0
+                  const predictedHuman = rawFused === 0
+                    ? 0
+                    : hasPrediction
+                    ? Math.min(1, Math.max(0, calibSlope! * rawFused + (calibIntercept ?? 0)))
+                    : null
+
+                  const aiPct  = Math.min(100, Math.max(0, rawFused * 100))
+                  const humPct = predictedHuman != null ? Math.min(100, Math.max(0, predictedHuman * 100)) : null
+
+                  return (
+                    <div style={{ marginTop: '10px' }}>
+                      <div style={{ position: 'relative', height: '28px', background: 'rgba(255,255,255,0.06)', borderRadius: '6px', marginTop: '6px' }}>
+                        {/* Band between AI and predicted-human marker */}
+                        {humPct != null && (() => {
+                          const bandL = Math.min(aiPct, humPct)
+                          const bandW = Math.abs(aiPct - humPct)
+                          return <div style={{ position: 'absolute', top: 0, left: `${bandL}%`, width: `${bandW}%`, height: '100%', background: 'var(--color-info)', opacity: 0.15, borderRadius: '6px' }} />
+                        })()}
+                        {/* AI fused score marker — full opacity, score of record */}
+                        <div style={{ position: 'absolute', top: '50%', left: `${aiPct}%`, transform: 'translate(-50%,-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3 }}>
+                          <div style={{ width: '13px', height: '13px', borderRadius: '50%', background: 'var(--accent)', boxShadow: '0 0 0 3px rgba(160,104,255,0.3)' }} />
+                          <span style={{ position: 'absolute', bottom: '-20px', fontSize: '11px', fontWeight: 700, color: 'var(--accent)', whiteSpace: 'nowrap' }}>{Math.round(rawFused * 100)}%</span>
+                        </div>
+                        {/* Predicted-human marker — 0.50 opacity, derived from Pearson/Spearman calibration */}
+                        {humPct != null && (
+                          <div style={{ position: 'absolute', top: '50%', left: `${humPct}%`, transform: 'translate(-50%,-50%)', opacity: 0.50, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            <div style={{ width: '11px', height: '11px', borderRadius: '50%', border: '2.5px solid var(--color-info)', background: 'transparent' }} />
+                            <span style={{ position: 'absolute', top: '-20px', fontSize: '11px', fontWeight: 600, color: 'var(--color-info)', whiteSpace: 'nowrap' }}>{Math.round(predictedHuman! * 100)}%</span>
+                          </div>
+                        )}
+                        {/* Loading state while calibration is fetching */}
+                        {!hasPrediction && (
+                          <div style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', fontSize: '10px', color: 'var(--text-subtle)' }}>⏳ loading human estimate…</div>
+                        )}
+                      </div>
+                      {/* Legend */}
+                      <div style={{ display: 'flex', gap: '14px', marginTop: '24px', fontSize: '11px', color: 'var(--text-muted)', alignItems: 'center' }}>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', background: 'var(--accent)' }} />
+                          AI score (authoritative)
+                        </span>
+                        <span style={{ display: 'flex', alignItems: 'center', gap: '5px', opacity: 0.55 }}>
+                          <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', border: '2px solid var(--color-info)', background: 'transparent' }} />
+                          Human estimate (calibration regression · Pearson/Spearman fit)
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })()}
 
                 {/* Your answer */}
                 <div className={styles.section}>

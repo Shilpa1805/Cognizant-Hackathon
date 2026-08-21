@@ -9,6 +9,7 @@ from app.database import engine, Base, SessionLocal
 from app.models.user import User
 from app.routers import auth, questions, sessions, answers, scores, dashboard, calibration
 from app.seed import seed_database
+from app.services.calibration import pre_warm_calibration_cache
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,13 @@ async def lifespan(app: FastAPI):
         logger.warning(f"Auto-seed notification: {e}")
     finally:
         db.close()
+
+    # Pre-warm calibration cache in background so /calibration/coefficients
+    # responds instantly once the scoring pipeline has run once.
+    import threading
+    t = threading.Thread(target=pre_warm_calibration_cache, daemon=True)
+    t.start()
+
     yield
 
 

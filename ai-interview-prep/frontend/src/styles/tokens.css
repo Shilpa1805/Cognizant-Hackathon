@@ -20,16 +20,21 @@
 
   --text-dark:     #000000;
   --text-light:    #ffffff;
+  --text-primary:  #ffffff;   /* alias for text-light — primary body text */
   --text-muted:    rgba(255, 255, 255, 0.55);
   --text-subtle:   rgba(255, 255, 255, 0.35);
 
   --border-dim:    rgba(255, 255, 255, 0.08);
   --border-bright: rgba(255, 255, 255, 0.18);
+  --border:        rgba(255, 255, 255, 0.10); /* general-purpose alias */
+
+  --surface:       rgba(255, 255, 255, 0.06); /* card/popover surface alias */
 
   /* Semantic status colors */
   --color-success: #4ade80;
   --color-warning: #fbbf24;
   --color-danger:  #f87171;
+  --color-error:   #f87171; /* alias for color-danger */
   --color-info:    #60a5fa;
 
   /* --------------------------------------------------
