@@ -58,14 +58,13 @@ export default function Landing() {
           <div className={styles.ctaRow}>
             <Button
               as="a"
-              href="/practice"
+              href="/login"
               variant="primary"
               size="lg"
               withBorder
               icon="›"
-              id="hero-get-started-btn"
             >
-              Start Practicing
+              Log In
             </Button>
             <Button
               as="a"
@@ -78,11 +77,6 @@ export default function Landing() {
             </Button>
           </div>
 
-          {/* Persona badge — appears at 3.6s */}
-          <div className={styles.badge}>
-            <span className={styles.badgeDot} aria-hidden="true" />
-            <span>Ananya · mock interview live</span>
-          </div>
         </div>
 
         {/* Right: full orbit visual — hero mode only on landing page */}

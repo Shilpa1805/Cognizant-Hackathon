@@ -35,9 +35,13 @@ export default function Analytics() {
   const [sessions, setSessions] = useState<SessionItem[]>([])
   const [loading, setLoading] = useState(true)
 
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id
 
   useEffect(() => {
+    if (!userId) {
+      setLoading(false)
+      return
+    }
     const load = async () => {
       try {
         const [dashRes, sessRes] = await Promise.all([

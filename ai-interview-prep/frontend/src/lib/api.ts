@@ -21,15 +21,28 @@ const api = axios.create({
 })
 
 // ---------------------------------------------------------------------------
-// Request interceptor — attach JWT from localStorage if present
-// TODO(auth-pair): Replace localStorage key with a proper auth context/store.
+// Request interceptor — attach Clerk JWT if present
 // ---------------------------------------------------------------------------
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+api.interceptors.request.use(async (config) => {
+  // Try to get token from global Clerk instance
+  const clerk = (window as any).Clerk;
+  if (clerk && clerk.session) {
+    try {
+      const token = await clerk.session.getToken();
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (e) {
+      console.warn("Failed to get Clerk token", e);
+    }
+  } else {
+    // Fallback for dev mode without Clerk
+    const fallback = localStorage.getItem('access_token');
+    if (fallback) {
+      config.headers.Authorization = `Bearer ${fallback}`;
+    }
   }
-  return config
+  return config;
 })
 
 // ---------------------------------------------------------------------------

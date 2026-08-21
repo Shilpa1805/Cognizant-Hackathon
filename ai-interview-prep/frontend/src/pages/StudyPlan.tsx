@@ -21,10 +21,12 @@ export default function StudyPlan() {
   const [plan, setPlan] = useState<StudyPlanEntry[]>([])
   const [loading, setLoading] = useState(true)
 
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id
 
   useEffect(() => {
     const load = async () => {
+      if (!userId) return
+
       try {
         // Use /dashboard/summary which returns study_plan with real topic_names already resolved
         const { data } = await api.get('/dashboard/summary', {

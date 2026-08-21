@@ -50,7 +50,7 @@ export default function History() {
   const [details, setDetails] = useState<Record<string, SessionDetail>>({})
   const [detailLoading, setDetailLoading] = useState<string | null>(null)
 
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id
 
   useEffect(() => {
     const load = async () => {

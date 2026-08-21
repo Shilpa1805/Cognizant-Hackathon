@@ -45,8 +45,7 @@ export default function Dashboard() {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Use fallback user UUID if none is available in auth
-  const userId = user?.user_id ?? '00000000-0000-0000-0000-000000000002'
+  const userId = user?.user_id;
 
   useEffect(() => {
     const load = async () => {
